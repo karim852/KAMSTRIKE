@@ -1,0 +1,42 @@
+id: camera-unauth-snapshot
+
+info:
+  name: IP Camera - Snapshot Endpoint Reachable Without Authentication
+  author: kamstrike
+  severity: high
+  description: |
+    A snapshot endpoint returned JPEG imagery to an unauthenticated request. This is the
+    outcome an attacker actually wants from a camera, and it is often reachable even when
+    the login page itself looks properly protected.
+  remediation: Require authentication on every media endpoint, not only the web UI.
+  metadata:
+    verified: true
+    max-request: 10
+  tags: camera,exposure,media,unauth,kamstrike
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/onvif-http/snapshot"
+      - "{{BaseURL}}/snapshot.cgi"
+      - "{{BaseURL}}/cgi-bin/snapshot.cgi"
+      - "{{BaseURL}}/axis-cgi/jpg/image.cgi"
+      - "{{BaseURL}}/ISAPI/Streaming/channels/101/picture"
+      - "{{BaseURL}}/tmpfs/auto.jpg"
+      - "{{BaseURL}}/anony/mjpg.cgi"
+      - "{{BaseURL}}/cgi-bin/viewer/video.jpg"
+      - "{{BaseURL}}/webcapture.jpg?command=snap&channel=1"
+      - "{{BaseURL}}/SnapshotJPEG?Resolution=640x480"
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: binary
+        part: body
+        binary:
+          - "ffd8ff"
+      - type: dsl
+        dsl:
+          - "len(body) > 1024"
+      - type: status
+        status:
+          - 200

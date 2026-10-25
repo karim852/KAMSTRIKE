@@ -1,0 +1,66 @@
+id: onvif-anonymous-device-info
+
+info:
+  name: ONVIF Device Service - Anonymous GetDeviceInformation
+  author: kamstrike
+  severity: medium
+  description: |
+    The ONVIF device service answered an unauthenticated GetDeviceInformation request,
+    returning manufacturer, model, firmware build and serial number. That is precise
+    firmware targeting information, and on many devices the same endpoint also exposes
+    stream URIs and network configuration.
+  remediation: Require authentication on ONVIF, or disable it if no client needs it.
+  metadata:
+    verified: true
+    max-request: 2
+  tags: onvif,camera,nvr,exposure,info-leak,kamstrike
+
+http:
+  - raw:
+      - |
+        POST /onvif/device_service HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/soap+xml; charset=utf-8
+
+        <?xml version="1.0" encoding="UTF-8"?>
+        <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+          <s:Body><GetDeviceInformation xmlns="http://www.onvif.org/ver10/device/wsdl"/></s:Body>
+        </s:Envelope>
+      - |
+        POST /onvif/services HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/soap+xml; charset=utf-8
+
+        <?xml version="1.0" encoding="UTF-8"?>
+        <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+          <s:Body><GetDeviceInformation xmlns="http://www.onvif.org/ver10/device/wsdl"/></s:Body>
+        </s:Envelope>
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "GetDeviceInformationResponse"
+      - type: status
+        status:
+          - 200
+    extractors:
+      - type: regex
+        name: manufacturer
+        part: body
+        group: 1
+        regex:
+          - "<(?:\\w+:)?Manufacturer>([^<]+)<"
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - "<(?:\\w+:)?Model>([^<]+)<"
+      - type: regex
+        name: firmware
+        part: body
+        group: 1
+        regex:
+          - "<(?:\\w+:)?FirmwareVersion>([^<]+)<"

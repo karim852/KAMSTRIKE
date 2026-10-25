@@ -1,0 +1,71 @@
+id: camera-vendor-detect
+
+info:
+  name: IP Camera / NVR / DVR - Vendor Detection
+  author: kamstrike
+  severity: info
+  description: |
+    Identifies the vendor and embedded web stack of camera, NVR and DVR web interfaces so
+    the rest of the scan can be narrowed to templates that actually apply.
+  metadata:
+    verified: true
+    max-request: 1
+  tags: camera,nvr,dvr,tech,detect,kamstrike
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/"
+    matchers-condition: or
+    matchers:
+      - type: word
+        name: hikvision
+        part: header
+        words:
+          - "App-webs"
+          - "DVRDVS-Webs"
+          - "DNVRS-Webs"
+        condition: or
+      - type: word
+        name: hikvision-body
+        part: body
+        words:
+          - "/doc/page/login.asp"
+      - type: word
+        name: dahua
+        part: body
+        words:
+          - "RPC2_Login"
+          - "DHLangCookie"
+        condition: or
+      - type: regex
+        name: axis
+        part: header
+        regex:
+          - 'realm="AXIS_'
+      - type: word
+        name: goahead
+        part: header
+        words:
+          - "GoAhead-Webs"
+      - type: word
+        name: uc-httpd
+        part: header
+        words:
+          - "uc-httpd"
+      - type: word
+        name: boa
+        part: header
+        words:
+          - "Boa/"
+    extractors:
+      - type: kval
+        name: server
+        kval:
+          - server
+      - type: regex
+        name: title
+        part: body
+        group: 1
+        regex:
+          - "<title[^>]*>([^<]+)</title>"

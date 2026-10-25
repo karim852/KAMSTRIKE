@@ -1,0 +1,527 @@
+# KAMSTRIKE vulnerability knowledge base.
+#
+# This file is the correlation layer: it maps a fingerprinted vendor onto the
+# weaknesses that actually matter for that vendor, the local verification check that
+# proves them, and the nuclei templates that cover them.
+#
+# Fields:
+#   id             stable slug used on the CLI (--only / --skip) and in reports
+#   cves           CVE ids, empty for issues that never got one
+#   vendors        vendors this applies to; ["*"] means any device
+#   stacks         embedded web stack names (GoAhead, Boa, uc-httpd ...)
+#   severity       info | low | medium | high | critical
+#   check          id of a kamstrike.checks module function, or null for nuclei-only
+#   nuclei         template ids to select from the nuclei template store
+#   intrusive      true when verification changes device state; needs --exploit
+#   advisory       true when the weakness has no safe remote test at all; the entry is
+#                  reported as an unverified candidate whenever the vendor matches, so the
+#                  operator knows to check it from the console
+#   wild           known exploited in the wild (CISA KEV or credible public reporting)
+
+entries:
+  # ---------------------------------------------------------------- Hikvision
+  - id: hikvision-auth-bypass
+    cves: [CVE-2017-7921]
+    vendors: [Hikvision]
+    device_types: [camera, nvr, dvr]
+    severity: critical
+    title: Hikvision improper authentication - full configuration and credential disclosure
+    description: >
+      An unauthenticated attacker appends a static base64 credential parameter to privileged
+      endpoints and receives the device configuration, including the user database with
+      recoverable passwords, plus live snapshots. Affects firmware roughly 5.2.0 through
+      5.4.41 across a very wide range of OEM rebadges (HiWatch, HiLook, Honeywell, many more).
+    affected: "firmware 5.2.0 - 5.4.41 (and OEM equivalents)"
+    check: hikvision_auth_bypass
+    nuclei: [CVE-2017-7921]
+    intrusive: false
+    wild: true
+    remediation: Upgrade to 5.4.5 or later and rotate every account; the old passwords are recoverable.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2017-7921
+      - https://www.hikvision.com/en/support/cybersecurity/security-advisory/security-notification-escalation-of-privilege-vulnerability-in-hikvision-ip-cameras/
+
+  - id: hikvision-webdav-rce
+    cves: [CVE-2021-36260]
+    vendors: [Hikvision]
+    device_types: [camera, nvr, dvr]
+    severity: critical
+    title: Hikvision unauthenticated command injection in the web language SDK endpoint
+    description: >
+      A message-handling flaw in the web server lets an unauthenticated request inject shell
+      commands that run as root. No credentials and no user interaction are needed. Over
+      70 product families are affected and the flaw is routinely weaponised by botnets.
+    affected: "numerous families, firmware before the September 2021 fix"
+    check: hikvision_cve_2021_36260
+    nuclei: [CVE-2021-36260]
+    intrusive: true
+    wild: true
+    remediation: Apply the vendor firmware update; the endpoint cannot be safely left exposed.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2021-36260
+      - https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+
+  - id: hikvision-isapi-info
+    cves: []
+    vendors: [Hikvision]
+    severity: info
+    title: Hikvision ISAPI device information reachable
+    description: The ISAPI tree is exposed; it reveals model, firmware build and serial number.
+    check: hikvision_isapi_info
+    nuclei: []
+    intrusive: false
+    wild: false
+    remediation: Restrict management interfaces to an administrative VLAN.
+    references: []
+
+  # ------------------------------------------------------------------- Dahua
+  - id: dahua-config-disclosure
+    cves: [CVE-2017-7925]
+    vendors: [Dahua]
+    device_types: [camera, nvr, dvr]
+    severity: critical
+    title: Dahua unauthenticated configuration download exposing password hashes
+    description: >
+      The web server serves configuration blobs without authentication, including the account
+      file. The hashes are a reversible MD5 variant, so retrieving the file is equivalent to
+      retrieving the administrator password.
+    affected: "firmware before the 2017 security releases, plus Amcrest/Lorex/Intelbras rebadges"
+    check: dahua_config_disclosure
+    nuclei: [CVE-2017-7925]
+    intrusive: false
+    wild: true
+    remediation: Upgrade firmware and rotate credentials on every rebadged unit too.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2017-7925
+
+  - id: dahua-auth-bypass
+    cves: [CVE-2021-33044, CVE-2021-33045]
+    vendors: [Dahua]
+    device_types: [camera, nvr, dvr]
+    severity: critical
+    title: Dahua identity authentication bypass (NetKeyboard / Loopback client types)
+    description: >
+      The login handler trusts an attacker-chosen client type. Requesting a special type
+      skips credential verification entirely and returns an authenticated session, giving
+      full device control over both the HTTP RPC interface and the binary protocol on 37777.
+    affected: "many IPC/VTO/NVR families with firmware before the September 2021 baseline"
+    check: dahua_auth_bypass
+    nuclei: [CVE-2021-33044]
+    intrusive: false
+    wild: true
+    remediation: Apply the vendor firmware baseline; no configuration change mitigates it.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2021-33044
+      - https://nvd.nist.gov/vuln/detail/CVE-2021-33045
+
+  - id: dahua-onvif-replay
+    cves: [CVE-2022-30563]
+    vendors: [Dahua]
+    severity: high
+    title: Dahua ONVIF WS-UsernameToken replay
+    description: >
+      The ONVIF service accepts a replayed WS-UsernameToken, so an attacker who can observe one
+      unencrypted ONVIF exchange can reuse it to authenticate as that account.
+    check: null
+    nuclei: []
+    intrusive: false
+    advisory: true
+    wild: false
+    remediation: Update firmware and move ONVIF traffic onto an isolated, encrypted segment.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2022-30563
+
+  # -------------------------------------------------------------------- Axis
+  - id: axis-srv-rce-chain
+    cves: [CVE-2018-10660, CVE-2018-10661, CVE-2018-10662]
+    vendors: [Axis]
+    severity: critical
+    title: Axis .srv authorization bypass chained to shell injection (unauthenticated root)
+    description: >
+      An authorization bypass in path handling exposes an unprotected internal API, which in
+      turn exposes an unrestricted dbus interface and a shell injection sink. Chained, the
+      three give unauthenticated root on roughly 390 camera models.
+    affected: "~390 models, firmware before the mid-2018 patches"
+    check: axis_srv_bypass
+    nuclei: [CVE-2018-10661]
+    intrusive: false
+    wild: false
+    remediation: Upgrade to patched firmware; the bypass is not mitigable by ACLs on the web root.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2018-10661
+      - https://www.vdoo.com/blog/significant-vulnerability-in-axis-cameras
+
+  # ----------------------------------------------------------------- Vivotek
+  - id: vivotek-path-traversal
+    cves: [CVE-2018-14786]
+    vendors: [Vivotek]
+    severity: high
+    title: Vivotek unauthenticated path traversal (arbitrary file read)
+    description: >
+      Insufficient path sanitisation in the web interface lets an unauthenticated request walk
+      out of the web root and read arbitrary files, including the credential store.
+    check: generic_path_traversal
+    nuclei: [CVE-2018-14786]
+    intrusive: false
+    wild: false
+    remediation: Upgrade firmware to the patched release.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2018-14786
+
+  # --------------------------------------------------------------- GeoVision
+  - id: geovision-cmd-injection
+    cves: [CVE-2024-11120, CVE-2024-6047]
+    vendors: [GeoVision]
+    severity: critical
+    title: GeoVision end-of-life device unauthenticated OS command injection
+    description: >
+      A CGI handler on discontinued GeoVision video servers and digital video recorders passes
+      request parameters into a shell. Unauthenticated remote code execution; observed being
+      used to enrol devices into botnets in 2024-2025. The affected models are end of life,
+      so no patch exists.
+    affected: "end-of-life GV video servers / DVRs - no fix available"
+    check: null
+    nuclei: [CVE-2024-11120]
+    intrusive: true
+    wild: true
+    remediation: These models are unpatchable. Replace them, or fully isolate them from routable networks.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2024-11120
+
+  - id: geovision-info-disclosure
+    cves: [CVE-2023-3357]
+    vendors: [GeoVision]
+    severity: high
+    title: GeoVision unauthenticated information disclosure
+    description: An unauthenticated endpoint returns system information useful for follow-on attacks.
+    check: null
+    nuclei: [CVE-2023-3357]
+    intrusive: false
+    wild: false
+    remediation: Upgrade where firmware exists; otherwise isolate.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2023-3357
+
+  # ------------------------------------------------------- TBK / OEM DVR family
+  - id: tbk-dvr-cred-dump
+    cves: [CVE-2018-9995]
+    vendors: [TBK, TVT]
+    device_types: [dvr, nvr]
+    severity: critical
+    title: DVR credential disclosure via forged authorization cookie
+    description: >
+      Sending a trivially forged session cookie to the user-list endpoint returns every account
+      with its cleartext password. The same codebase ships under a long list of brands
+      (TBK, Novo, CeNova, QSee, Pulnix, XVR 5-in-1, Night OWL and others), which is why this
+      one bug keeps showing up on internet-wide scans years after disclosure.
+    check: dvr_cookie_cred_dump
+    nuclei: [CVE-2018-9995]
+    intrusive: false
+    wild: true
+    remediation: Replace the recorder or place it behind a VPN; most affected brands never shipped a fix.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2018-9995
+
+  - id: tbk-dvr-cmd-injection
+    cves: [CVE-2024-3721]
+    vendors: [TBK]
+    device_types: [dvr]
+    severity: critical
+    title: TBK DVR-4104 / DVR-4216 unauthenticated command injection
+    description: >
+      A request parameter on the device status endpoint reaches a shell. Mirai variants adopted
+      it within weeks of disclosure and it remains one of the most-exploited DVR bugs.
+    check: null
+    nuclei: [CVE-2024-3721]
+    intrusive: true
+    wild: true
+    remediation: No vendor fix for the affected models; remove them from routable networks.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2024-3721
+
+  - id: tvt-path-traversal
+    cves: [CVE-2019-20085]
+    vendors: [TVT]
+    severity: high
+    title: TVT NVMS unauthenticated directory traversal (arbitrary file read)
+    description: >
+      The web interface resolves encoded traversal sequences, letting an unauthenticated request
+      read any file the web server can reach, which on these recorders means the whole filesystem.
+    check: generic_path_traversal
+    nuclei: [CVE-2019-20085]
+    intrusive: false
+    wild: true
+    remediation: Upgrade firmware; restrict management access meanwhile.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2019-20085
+
+  # ------------------------------------------------------------------ Avtech
+  - id: avtech-cmd-injection
+    cves: [CVE-2024-7029]
+    vendors: [Avtech]
+    severity: critical
+    title: AVTECH camera unauthenticated command injection in the device settings CGI
+    description: >
+      A settings parameter is concatenated into a shell command, giving unauthenticated remote
+      code execution. Added to the CISA exploited-vulnerabilities catalogue after botnet use;
+      the affected models are end of life.
+    affected: "AVM1203 and related end-of-life models - no fix available"
+    check: null
+    nuclei: [CVE-2024-7029]
+    intrusive: true
+    wild: true
+    remediation: Unpatchable. Decommission or fully isolate.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2024-7029
+      - https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+
+  # --------------------------------------------------- WIFICAM / GoAhead OEM mass
+  - id: wificam-cred-leak
+    cves: [CVE-2017-5674]
+    vendors: [WIFICAM]
+    stacks: [GoAhead]
+    severity: critical
+    title: GoAhead OEM "cloud" camera credential leak and unauthenticated RTSP
+    description: >
+      A configuration file is served without authentication and contains the administrator
+      username and password in cleartext. The same firmware also leaves the RTSP server
+      unauthenticated. Shipped under more than a thousand white-label brands.
+    check: wificam_cred_leak
+    nuclei: [CVE-2017-5674]
+    intrusive: false
+    wild: true
+    remediation: These devices are not maintainable. Replace them.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2017-5674
+      - https://pierrekim.github.io/blog/2017-03-08-camera-goahead-0day.html
+
+  - id: goahead-ldpreload-rce
+    cves: [CVE-2017-17562]
+    vendors: ["*"]
+    stacks: [GoAhead]
+    severity: critical
+    title: GoAhead web server CGI environment poisoning leading to remote code execution
+    description: >
+      GoAhead copies request parameters into the CGI process environment, so a request can set
+      the dynamic loader preload variable and execute attacker-supplied code. Affects GoAhead
+      2.5 through 3.6.5, which is the web server inside a large share of budget camera firmware.
+    check: null
+    nuclei: [CVE-2017-17562]
+    intrusive: true
+    wild: true
+    remediation: Upgrade GoAhead to 3.6.5+ (usually means new firmware, often unavailable).
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2017-17562
+
+  # --------------------------------------------------------------- Xiongmai
+  - id: xiongmai-uc-httpd-overflow
+    cves: [CVE-2018-10088]
+    vendors: [Xiongmai]
+    stacks: [uc-httpd]
+    severity: critical
+    title: uc-httpd 1.0.0 stack buffer overflow
+    description: >
+      The embedded uc-httpd server overflows a stack buffer when handling an oversized request,
+      which is exploitable for code execution. uc-httpd 1.0.0 is a reliable marker for the
+      Xiongmai OEM platform behind a very large number of white-label recorders.
+    check: uc_httpd_detect
+    nuclei: []
+    intrusive: false
+    wild: true
+    remediation: Replace the device; Xiongmai OEM units generally receive no security firmware.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2018-10088
+
+  - id: xiongmai-xmeye-backdoor
+    cves: [CVE-2017-16725]
+    vendors: [Xiongmai]
+    severity: critical
+    title: Xiongmai / XMEye default administrator with no password and undocumented services
+    description: >
+      The platform ships an administrator account with an empty password, an undocumented
+      telnet service, and a cloud P2P identifier derived from the MAC address that allows
+      locating the device from the internet regardless of firewalling.
+    check: xiongmai_dvrip_probe
+    nuclei: []
+    intrusive: false
+    wild: true
+    remediation: Replace the device. Disabling P2P in the UI does not reliably disable the service.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2017-16725
+
+  # ----------------------------------------------------------------- D-Link
+  - id: dlink-dcs-cred-disclosure
+    cves: [CVE-2020-25078]
+    vendors: ["D-Link"]
+    severity: critical
+    title: D-Link DCS camera unauthenticated administrator password disclosure
+    description: >
+      An unauthenticated request to a user-configuration endpoint returns the administrator
+      password, which also unlocks the RTSP stream and any reused credentials.
+    affected: "DCS-2530L, DCS-2670L and related, before the 2020 firmware"
+    check: dlink_dcs_getuser
+    nuclei: [CVE-2020-25078]
+    intrusive: false
+    wild: true
+    remediation: Upgrade firmware and rotate the password.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2020-25078
+
+  - id: dlink-alphapd-overflow
+    cves: [CVE-2019-10999]
+    vendors: ["D-Link"]
+    severity: high
+    title: D-Link DCS stack buffer overflow in the alphapd web server
+    description: An authenticated request overflows a stack buffer in alphapd, allowing code execution.
+    check: null
+    nuclei: []
+    intrusive: false
+    advisory: true
+    wild: false
+    remediation: Upgrade firmware.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2019-10999
+
+  # ------------------------------------------------------------------- NUUO
+  - id: nuuo-backdoor
+    cves: [CVE-2018-1150]
+    vendors: [NUUO]
+    severity: critical
+    title: NUUO NVRMini2 leftover debug endpoint allowing password reset
+    description: >
+      A debug script left in the shipped firmware is reachable without authentication and lets
+      an attacker enumerate and reset accounts, including the administrator.
+    check: null
+    nuclei: [CVE-2018-1150]
+    intrusive: true
+    wild: false
+    remediation: Upgrade firmware; the model line is largely end of life.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2018-1150
+
+  - id: nuuo-peekaboo
+    cves: [CVE-2018-1149]
+    vendors: [NUUO]
+    severity: critical
+    title: NUUO NVRMini2 unauthenticated stack overflow ("Peekaboo")
+    description: >
+      An oversized session cookie overflows a stack buffer in the CGI handler, giving
+      unauthenticated root and access to every camera the recorder manages.
+    check: null
+    nuclei: []
+    intrusive: false
+    advisory: true
+    wild: false
+    remediation: Upgrade firmware or decommission.
+    references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2018-1149
+
+  # --------------------------------------------------------------- Foscam/Netwave
+  - id: netwave-info-disclosure
+    cves: []
+    vendors: [Foscam]
+    severity: high
+    title: Netwave OEM camera memory disclosure leaking credentials
+    description: >
+      A diagnostic endpoint dumps process memory, which reliably contains the administrator
+      credentials. Present on Netwave-based Foscam OEM units and many rebadges.
+    check: netwave_info_leak
+    nuclei: [netwave-ip-camera-info-disclosure]
+    intrusive: false
+    wild: true
+    remediation: Replace the device or firewall it off entirely.
+    references:
+      - https://www.exploit-db.com/exploits/40500
+
+  # ----------------------------------------------------------------- Generic
+  - id: unauth-snapshot
+    cves: []
+    vendors: ["*"]
+    severity: high
+    title: Live snapshot or video stream reachable without authentication
+    description: >
+      A snapshot or MJPEG endpoint returns imagery to an unauthenticated request. This is the
+      outcome an attacker actually wants from a camera, and it is frequently reachable even when
+      the login page itself looks properly protected.
+    check: unauth_snapshot
+    nuclei: []
+    intrusive: false
+    wild: true
+    remediation: Require authentication on all media endpoints; do not rely on the login page alone.
+    references: []
+
+  - id: default-credentials
+    cves: []
+    vendors: ["*"]
+    severity: critical
+    title: Factory-default or trivially guessable credentials accepted
+    description: >
+      The device accepted a documented factory-default credential pair. This is the single most
+      common root cause of camera compromise and gives the attacker everything the console gives
+      an administrator - live video, stored recordings, network configuration and a foothold.
+    check: default_credentials
+    nuclei: []
+    intrusive: false
+    wild: true
+    remediation: Change every account password and disable unused accounts.
+    references: []
+
+  - id: rtsp-no-auth
+    cves: []
+    vendors: ["*"]
+    severity: high
+    title: RTSP stream served without authentication
+    description: >
+      The RTSP server described a media stream to an unauthenticated client, so the live feed can
+      be pulled by anyone who can reach port 554.
+    check: rtsp_probe
+    nuclei: []
+    intrusive: false
+    wild: true
+    remediation: Enable RTSP authentication and restrict the port to the recording server.
+    references: []
+
+  - id: onvif-anonymous
+    cves: []
+    vendors: ["*"]
+    severity: medium
+    title: ONVIF service answers device information requests anonymously
+    description: >
+      The ONVIF endpoint returned manufacturer, model, firmware and serial to an unauthenticated
+      SOAP request, which hands an attacker exact firmware targeting information.
+    check: onvif_probe
+    nuclei: []
+    intrusive: false
+    wild: false
+    remediation: Require authentication on ONVIF, or disable it if no client needs it.
+    references: []
+
+  - id: telnet-exposed
+    cves: []
+    vendors: ["*"]
+    severity: medium
+    title: Telnet service exposed
+    description: >
+      Telnet is open. On this class of device it is normally an undocumented debug service with a
+      hardcoded or default root password, and it carries credentials in cleartext.
+    check: telnet_exposed
+    nuclei: []
+    intrusive: false
+    wild: true
+    remediation: Disable telnet. If the firmware offers no way to, replace the device.
+    references: []
+
+  - id: http-no-auth-admin
+    cves: []
+    vendors: ["*"]
+    severity: critical
+    title: Administrative interface reachable with no authentication at all
+    description: >
+      A configuration or administrative endpoint returned content to an anonymous request, so the
+      device is effectively unprotected.
+    check: unauth_admin
+    nuclei: []
+    intrusive: false
+    wild: true
+    remediation: Enable authentication and verify it applies to every endpoint, not just the UI.
+    references: []

@@ -1,0 +1,43 @@
+/*
+ * KAMSTRIKE work palette.
+ *
+ * One dark scheme only. An operator reads this during an engagement, often beside a video
+ * wall, and a white panel at 2am is a liability - so there is no light variant to drift out
+ * of sync. Severity hues are the only saturated colours in the interface, which keeps a
+ * critical finding impossible to miss.
+ */
+:root {
+  /* surfaces, darkest to lightest */
+  --bg:        #000000;   /* page - the logo is drawn on true black */
+  --panel:     #0d1116;   /* cards */
+  --panel-2:   #141a21;   /* inputs, nested blocks */
+  --panel-3:   #1b222b;   /* hover */
+  --line:      #222a34;   /* borders */
+  --line-soft: #1a202a;   /* subtle dividers */
+
+  /* type */
+  --fg:        #e8edf2;
+  --fg-dim:    #b9c2cd;
+  --muted:     #7f8a98;
+  --faint:     #5a6472;
+
+  /* brand - the green is sampled from the logo's reticle */
+  --accent:      #0bf5ae;  /* primary actions, confirmed state, live indicators */
+  --accent-dim:  #0a9c72;
+  --accent-glow: rgba(11, 245, 174, .16);
+  --accent-ink:  #04120e;  /* text on an accent fill */
+  --record:      #ff2d55;  /* recording / live-feed cue only */
+
+  /* severity - the only loud colours in the UI */
+  --critical: #ff3b5c;
+  --high:     #ff8a3d;
+  --medium:   #ffc53d;
+  --low:      #3da5ff;
+  --info:     #7a8694;
+
+  /* geometry */
+  --radius:    10px;
+  --radius-sm: 7px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

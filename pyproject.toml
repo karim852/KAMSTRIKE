@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kamstrike"
+version = "0.1.0"
+description = "Authorized security assessment framework for IP cameras, NVRs and DVRs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "httpx>=0.27",
+    "PyYAML>=6.0",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5"]
+
+[project.scripts]
+kamstrike = "kamstrike.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["kamstrike*"]
+
+[tool.setuptools.package-data]
+kamstrike = ["data/*.yaml", "data/*.txt", "nuclei/templates/*.yaml"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    # a scanner must never let one hostile device abort the run, so stages catch broadly
+    # and record the failure on the device instead
+    "BLE001",
+    # payload strings are clearer with inline flags
+    "FURB167",
+]

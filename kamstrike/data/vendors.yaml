@@ -1,0 +1,260 @@
+# KAMSTRIKE vendor fingerprint database.
+#
+# Each vendor carries weighted rules. A rule kind is one of:
+#   server   - substring of the HTTP Server header (case-insensitive)
+#   realm    - substring of the WWW-Authenticate realm
+#   title    - substring of the HTML <title>
+#   body     - substring of a fetched page body
+#   header   - "name: substring" against any response header
+#   cookie   - substring of a Set-Cookie value
+#   path     - probe this path; matches when status is in `status` and all `contains` hit
+#   port     - this port being open (weak evidence on its own)
+#   rtsp     - substring of the RTSP OPTIONS/DESCRIBE reply
+#   onvif    - substring of the ONVIF GetDeviceInformation reply
+#
+# Scores accumulate; the highest-scoring vendor above `min_score` wins.
+min_score: 0.6
+
+vendors:
+  - name: Hikvision
+    device_types: [camera, nvr, dvr]
+    aliases: [hikvision, hik, hiwatch, hilook]
+    rules:
+      - { kind: server, value: "App-webs", weight: 0.9 }
+      - { kind: server, value: "DVRDVS-Webs", weight: 0.95 }
+      - { kind: server, value: "DNVRS-Webs", weight: 0.95 }
+      - { kind: server, value: "Hikvision", weight: 1.0 }
+      - { kind: realm, value: "Hikvision", weight: 0.9 }
+      - { kind: body, value: "/doc/page/login.asp", weight: 0.9 }
+      - { kind: body, value: "Hikvision", weight: 0.8 }
+      - { kind: body, value: "ISAPI", weight: 0.5 }
+      - { kind: title, value: "Hikvision", weight: 0.9 }
+      - { kind: rtsp, value: "Hikvision", weight: 0.8 }
+      - { kind: port, value: "8000", weight: 0.2 }
+      - { kind: path, value: "/doc/page/login.asp", status: [200], contains: ["login"], weight: 0.9 }
+      - { kind: path, value: "/ISAPI/System/deviceInfo", status: [200, 401], contains: [], weight: 0.7 }
+      - { kind: path, value: "/SDK/webLanguage", status: [200, 400, 401, 500], contains: [], weight: 0.3 }
+
+  - name: Dahua
+    device_types: [camera, nvr, dvr]
+    aliases: [dahua, amcrest, lorex, intelbras, imou, "dh-"]
+    rules:
+      - { kind: title, value: "WEB SERVICE", weight: 0.9 }
+      - { kind: body, value: "/js/merge.js", weight: 0.7 }
+      - { kind: body, value: "RPC2_Login", weight: 0.9 }
+      - { kind: body, value: "dahua", weight: 0.9 }
+      - { kind: cookie, value: "DHLangCookie", weight: 0.9 }
+      - { kind: realm, value: "Login to ", weight: 0.4 }
+      - { kind: port, value: "37777", weight: 0.7 }
+      - { kind: onvif, value: "Dahua", weight: 1.0 }
+      - { kind: path, value: "/RPC2_Login", status: [200, 400, 405], contains: [], weight: 0.6 }
+      - { kind: path, value: "/current_config/Account1", status: [200], contains: [], weight: 0.8 }
+
+  - name: Axis
+    device_types: [camera, encoder]
+    aliases: [axis, "axis communications"]
+    rules:
+      - { kind: realm, value: "AXIS_", weight: 1.0 }
+      - { kind: server, value: "Axis", weight: 0.95 }
+      - { kind: body, value: "axis-cgi", weight: 0.9 }
+      - { kind: title, value: "AXIS", weight: 0.9 }
+      - { kind: onvif, value: "AXIS", weight: 1.0 }
+      - { kind: path, value: "/axis-cgi/param.cgi", status: [200, 401], contains: [], weight: 0.85 }
+
+  - name: Vivotek
+    device_types: [camera, nvr]
+    aliases: [vivotek, vvtk]
+    rules:
+      - { kind: server, value: "VVTK", weight: 1.0 }
+      - { kind: body, value: "VIVOTEK", weight: 0.9 }
+      - { kind: realm, value: "Network Camera", weight: 0.3 }
+      - { kind: path, value: "/cgi-bin/viewer/video.jpg", status: [200, 401], contains: [], weight: 0.6 }
+
+  - name: GeoVision
+    device_types: [camera, nvr, access-control]
+    aliases: [geovision, "gv-"]
+    rules:
+      - { kind: server, value: "GeoHttpServer", weight: 1.0 }
+      - { kind: title, value: "GeoVision", weight: 0.95 }
+      - { kind: body, value: "geo-cgi", weight: 0.9 }
+      - { kind: path, value: "/ssi.cgi/Login.htm", status: [200], contains: [], weight: 0.9 }
+
+  - name: Xiongmai
+    device_types: [camera, nvr, dvr]
+    aliases: [xiongmai, xmeye, netsurveillance, "xm"]
+    rules:
+      - { kind: server, value: "uc-httpd", weight: 1.0 }
+      - { kind: body, value: "NetSurveillance", weight: 0.95 }
+      - { kind: body, value: "XMEye", weight: 0.95 }
+      - { kind: port, value: "34567", weight: 0.7 }
+      - { kind: port, value: "8899", weight: 0.3 }
+
+  - name: TVT
+    device_types: [nvr, dvr, camera]
+    aliases: [tvt, nvms, "tvt digital"]
+    rules:
+      - { kind: body, value: "NVMS", weight: 0.9 }
+      - { kind: title, value: "NVMS", weight: 0.9 }
+      - { kind: body, value: "TVT", weight: 0.6 }
+      - { kind: path, value: "/doc/script/config.js", status: [200], contains: [], weight: 0.4 }
+
+  - name: TBK
+    device_types: [dvr, nvr]
+    aliases: [tbk, cenova, qsee, novo, pulnix, "xvr 5 in 1", "night owl"]
+    rules:
+      - { kind: body, value: "device.rsp", weight: 0.8 }
+      - { kind: body, value: "DVR_H264", weight: 0.7 }
+      - { kind: path, value: "/device.rsp", status: [200], contains: [], weight: 0.8 }
+
+  - name: Avtech
+    device_types: [camera, dvr, nvr]
+    aliases: [avtech, avm, "av tech"]
+    rules:
+      - { kind: title, value: "AVTECH", weight: 0.95 }
+      - { kind: body, value: "/cgi-bin/nobody/", weight: 0.9 }
+      - { kind: body, value: "Avtech", weight: 0.9 }
+      - { kind: path, value: "/cgi-bin/nobody/Machine.cgi", status: [200, 401], contains: [], weight: 0.8 }
+
+  - name: Foscam
+    device_types: [camera]
+    aliases: [foscam, foscam-oem]
+    rules:
+      - { kind: server, value: "Netwave IP Camera", weight: 0.9 }
+      - { kind: body, value: "Foscam", weight: 0.9 }
+      - { kind: realm, value: "ipcam", weight: 0.5 }
+      - { kind: path, value: "/get_status.cgi", status: [200], contains: ["sys_ver"], weight: 0.9 }
+
+  - name: WIFICAM
+    device_types: [camera]
+    aliases: [wificam, "p2p wificam", goahead-cam, "cloud camera"]
+    rules:
+      - { kind: server, value: "GoAhead-Webs", weight: 0.6 }
+      - { kind: body, value: "loginuse", weight: 0.9 }
+      - { kind: path, value: "/system.ini", status: [200], contains: [], weight: 0.9 }
+      - { kind: path, value: "/web/cgi-bin/hi3510/param.cgi", status: [200, 401], contains: [], weight: 0.7 }
+
+  - name: Reolink
+    device_types: [camera, nvr]
+    aliases: [reolink]
+    rules:
+      - { kind: body, value: "Reolink", weight: 0.95 }
+      - { kind: path, value: "/cgi-bin/api.cgi?cmd=GetDevInfo", status: [200], contains: [], weight: 0.8 }
+
+  - name: "D-Link"
+    device_types: [camera, nvr]
+    aliases: [dlink, "d-link", dcs]
+    rules:
+      - { kind: realm, value: "DCS-", weight: 1.0 }
+      - { kind: body, value: "D-Link", weight: 0.9 }
+      - { kind: server, value: "alphapd", weight: 0.9 }
+      - { kind: path, value: "/common/info.cgi", status: [200], contains: [], weight: 0.7 }
+
+  - name: NUUO
+    device_types: [nvr]
+    aliases: [nuuo, nvrmini, nvrsolo]
+    rules:
+      - { kind: body, value: "NUUO", weight: 0.95 }
+      - { kind: title, value: "Network Video Recorder", weight: 0.4 }
+      - { kind: path, value: "/login.php", status: [200], contains: ["NUUO"], weight: 0.9 }
+
+  - name: Uniview
+    device_types: [camera, nvr]
+    aliases: [uniview, unv]
+    rules:
+      - { kind: body, value: "uniview", weight: 0.9 }
+      - { kind: body, value: "/Interface/Login", weight: 0.8 }
+      - { kind: onvif, value: "Uniview", weight: 1.0 }
+
+  - name: Hanwha
+    device_types: [camera, nvr]
+    aliases: [hanwha, "hanwha techwin", samsung, wisenet]
+    rules:
+      - { kind: body, value: "Wisenet", weight: 0.95 }
+      - { kind: body, value: "Hanwha", weight: 0.95 }
+      - { kind: realm, value: "iPolis", weight: 0.8 }
+      - { kind: onvif, value: "Hanwha", weight: 1.0 }
+
+  - name: Bosch
+    device_types: [camera, encoder]
+    aliases: [bosch, videojet, dinion]
+    rules:
+      - { kind: server, value: "VideoJet", weight: 0.95 }
+      - { kind: body, value: "Bosch", weight: 0.9 }
+      - { kind: path, value: "/rcp.xml", status: [200], contains: [], weight: 0.8 }
+
+  - name: Panasonic
+    device_types: [camera]
+    aliases: [panasonic, "i-pro", wv-]
+    rules:
+      - { kind: body, value: "Panasonic", weight: 0.9 }
+      - { kind: body, value: "nphMotionJpeg", weight: 0.9 }
+      - { kind: realm, value: "i-PRO", weight: 0.9 }
+
+  - name: Sony
+    device_types: [camera]
+    aliases: [sony, ipela, snc-]
+    rules:
+      - { kind: body, value: "SNC-", weight: 0.8 }
+      - { kind: path, value: "/command/inquiry.cgi", status: [200, 401], contains: [], weight: 0.8 }
+
+  - name: Mobotix
+    device_types: [camera]
+    aliases: [mobotix]
+    rules:
+      - { kind: realm, value: "MOBOTIX", weight: 1.0 }
+      - { kind: body, value: "MOBOTIX", weight: 0.95 }
+      - { kind: path, value: "/control/userimage.html", status: [200, 401], contains: [], weight: 0.7 }
+
+  - name: Trendnet
+    device_types: [camera]
+    aliases: [trendnet, "tv-ip"]
+    rules:
+      - { kind: realm, value: "netcam", weight: 0.8 }
+      - { kind: body, value: "TRENDnet", weight: 0.95 }
+      - { kind: path, value: "/anony/mjpg.cgi", status: [200], contains: [], weight: 0.8 }
+
+  - name: Vstarcam
+    device_types: [camera]
+    aliases: [vstarcam, eye4, "ptz camera"]
+    rules:
+      - { kind: body, value: "vstarcam", weight: 0.95 }
+      - { kind: path, value: "/check_user.cgi", status: [200], contains: [], weight: 0.8 }
+
+  - name: Ubiquiti
+    device_types: [camera, nvr]
+    aliases: [ubiquiti, unifi, "unifi protect", airvision]
+    rules:
+      - { kind: body, value: "UniFi", weight: 0.9 }
+      - { kind: path, value: "/api/system", status: [200, 401], contains: [], weight: 0.6 }
+
+  - name: Honeywell
+    device_types: [camera, nvr]
+    aliases: [honeywell, "performance series"]
+    rules:
+      - { kind: body, value: "Honeywell", weight: 0.95 }
+      - { kind: realm, value: "Honeywell", weight: 0.95 }
+
+  - name: Milesight
+    device_types: [camera, nvr]
+    aliases: [milesight]
+    rules:
+      - { kind: body, value: "Milesight", weight: 0.95 }
+      - { kind: onvif, value: "Milesight", weight: 1.0 }
+
+  - name: ACTi
+    device_types: [camera]
+    aliases: [acti]
+    rules:
+      - { kind: realm, value: "ACTi", weight: 1.0 }
+      - { kind: body, value: "ACTi", weight: 0.85 }
+
+# Generic web stacks. Low weight on their own but they unlock stack-level checks
+# (GoAhead LD_PRELOAD, Boa traversal) regardless of who badged the plastic.
+stacks:
+  - { name: GoAhead, kind: server, value: "GoAhead", cves: ["CVE-2017-17562"] }
+  - { name: Boa, kind: server, value: "Boa/", cves: ["CVE-2017-9833"] }
+  - { name: uc-httpd, kind: server, value: "uc-httpd", cves: ["CVE-2018-10088"] }
+  - { name: thttpd, kind: server, value: "thttpd", cves: [] }
+  - { name: lighttpd, kind: server, value: "lighttpd", cves: [] }
+  - { name: Hipcam, kind: server, value: "Hipcam", cves: [] }
+  - { name: Router Webs, kind: server, value: "Router Webs", cves: [] }

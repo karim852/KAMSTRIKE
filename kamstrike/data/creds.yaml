@@ -1,0 +1,154 @@
+# Factory-default credentials shipped by camera / NVR / DVR vendors.
+#
+# `global` is tried against any device. Vendor blocks are tried only when the
+# fingerprint stage identified that vendor, which keeps the spray small enough to
+# stay under the account-lockout thresholds most firmware enforces.
+#
+# Passwords written as "" mean an empty password. Entries are ordered most-likely-first.
+
+global:
+  - [admin, admin]
+  - [admin, ""]
+  - [admin, "12345"]
+  - [admin, "123456"]
+  - [admin, password]
+  - [admin, "1234"]
+  - [admin, "admin123"]
+  - [admin, "9999"]
+  - [admin, "4321"]
+  - [root, root]
+  - [root, admin]
+  - [root, "12345"]
+  - [root, pass]
+  - [user, user]
+  - [guest, guest]
+  - [supervisor, supervisor]
+  - [operator, operator]
+  - ["666666", "666666"]
+  - ["888888", "888888"]
+
+vendors:
+  Hikvision:
+    - [admin, "12345"]
+    - [admin, "abc12345"]
+    - [admin, admin]
+    - [admin, "hik12345"]
+    - [admin, "Admin12345"]
+    - [operator, "12345"]
+  Dahua:
+    - [admin, admin]
+    - [admin, "admin123"]
+    - [admin, "888888"]
+    - [888888, "888888"]
+    - [666666, "666666"]
+    - [default, "tluafed"]
+  Axis:
+    - [root, pass]
+    - [root, root]
+    - [root, admin]
+    - [root, "12345"]
+  Vivotek:
+    - [root, ""]
+    - [root, root]
+    - [admin, admin]
+  GeoVision:
+    - [admin, admin]
+    - [admin, "1234"]
+  Xiongmai:
+    - [admin, ""]
+    - [admin, "tlJwpbo6"]
+    - [default, "tluafed"]
+    - [root, xc3511]
+    - [root, "juantech"]
+  TVT:
+    - [admin, "123456"]
+    - [admin, "admin"]
+  TBK:
+    - [admin, "admin"]
+    - [admin, ""]
+    - [admin, "1234"]
+  Avtech:
+    - [admin, admin]
+    - [admin, "1234"]
+    - [guest, guest]
+  Foscam:
+    - [admin, ""]
+    - [admin, admin]
+    - [admin, "888888"]
+  WIFICAM:
+    - [admin, ""]
+    - [admin, admin]
+    - [admin, "123456"]
+  Reolink:
+    - [admin, ""]
+    - [admin, admin]
+  "D-Link":
+    - [admin, ""]
+    - [admin, admin]
+  NUUO:
+    - [admin, admin]
+    - [admin, ""]
+  Uniview:
+    - [admin, "123456"]
+    - [admin, admin]
+  Hanwha:
+    - [admin, "4321"]
+    - [admin, admin]
+    - [admin, "1111111"]
+  Bosch:
+    - [service, ""]
+    - [srvadmin, ""]
+    - [admin, admin]
+  Panasonic:
+    - [admin, "12345"]
+    - [admin, admin]
+  Sony:
+    - [admin, admin]
+    - [admin, ""]
+  Mobotix:
+    - [admin, meinsm]
+  Trendnet:
+    - [admin, admin]
+    - [admin, ""]
+  Vstarcam:
+    - [admin, "888888"]
+    - [admin, admin]
+  Honeywell:
+    - [admin, "1234"]
+    - [administrator, "1234"]
+  Milesight:
+    - [admin, "ms1234"]
+    - [admin, admin]
+  ACTi:
+    - [admin, "123456"]
+    - [Admin, "123456"]
+
+# Credentials the Mirai family sprays at telnet/SSH on this class of device.
+# Only used when --telnet is requested; telnet logins are slow and noisy.
+telnet:
+  - [root, xc3511]
+  - [root, vizxv]
+  - [root, admin]
+  - [root, ""]
+  - [root, "888888"]
+  - [root, juantech]
+  - [root, "54321"]
+  - [root, anko]
+  - [root, zlxx.]
+  - [root, "7ujMko0vizxv"]
+  - [root, "7ujMko0admin"]
+  - [root, system]
+  - [root, ikwb]
+  - [root, dreambox]
+  - [root, hi3518]
+  - [root, klv123]
+  - [root, "jvbzd"]
+  - [admin, admin]
+  - [admin, "1111"]
+  - [admin, smcadmin]
+  - [support, support]
+  - [service, service]
+  - [supervisor, supervisor]
+  - [guest, "12345"]
+  - [user, user]
+  - [default, ""]

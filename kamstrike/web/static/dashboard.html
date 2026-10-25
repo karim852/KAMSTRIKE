@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>KAMSTRIKE</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand.css">
+<style>
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  code, .mono { font-family: var(--mono); font-size: 12.5px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h2 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em;
+       color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+
+  header {
+    display: flex; align-items: center; gap: 18px; padding: 10px 18px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+    position: sticky; top: 0; z-index: 20;
+  }
+  header .lockup { display: flex; align-items: center; gap: 11px; }
+  header .lockup .mark { height: 30px; width: auto; display: block; }
+  header .lockup .word { height: 15px; width: auto; display: block; }
+  header .meta { color: var(--faint); font-size: 11.5px; line-height: 1.35; }
+  header .spacer { flex: 1; }
+  nav { display: flex; gap: 3px; }
+  nav button {
+    background: transparent; color: var(--muted); border: 1px solid transparent;
+    border-radius: var(--radius-sm); padding: 6px 13px; cursor: pointer;
+    font: inherit; font-size: 13px; font-weight: 500;
+  }
+  nav button:hover { color: var(--fg); background: var(--panel-2); }
+  nav button.active { color: var(--accent-ink); background: var(--accent); border-color: var(--accent);
+                      font-weight: 700; }
+
+  main { padding: 18px; max-width: 1560px; margin: 0 auto; }
+  .layout { display: grid; grid-template-columns: 276px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+          padding: 14px; margin-bottom: 14px; }
+
+  .btn {
+    background: var(--panel-2); color: var(--fg-dim); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 6px 12px; cursor: pointer; font: inherit;
+    font-size: 13px;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--fg); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+                 font-weight: 700; }
+  .btn.primary:hover { box-shadow: 0 0 0 3px var(--accent-glow); }
+  .btn.sm { padding: 2px 8px; font-size: 12px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 9px; }
+  .tile { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
+          padding: 9px 12px; }
+  .tile .n { font-size: 21px; font-weight: 700; line-height: 1.15; }
+  .tile .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint);
+       cursor: pointer; user-select: none; white-space: nowrap; position: sticky; top: 0;
+       background: var(--panel); z-index: 1; }
+  th:hover { color: var(--fg-dim); }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--panel-2); }
+
+  .pill { display: inline-block; border-radius: 4px; padding: 1px 7px; font-size: 10.5px;
+          font-weight: 700; color: var(--accent-ink); letter-spacing: .03em; }
+  .pill.critical { background: var(--critical); color: #fff; }
+  .pill.high { background: var(--high); } .pill.medium { background: var(--medium); }
+  .pill.low { background: var(--low); } .pill.info { background: var(--info); color: #fff; }
+  .tag { display: inline-block; background: var(--panel-2); border: 1px solid var(--line);
+         border-radius: 5px; padding: 0 6px; font-size: 10.5px; color: var(--muted);
+         margin: 1px 3px 1px 0; }
+  .tag.warn { border-color: var(--high); color: var(--high); }
+  .tag.live { border-color: var(--record); color: var(--record); }
+  .tag.ok { border-color: var(--accent-dim); color: var(--accent); }
+
+  .scan { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+          margin-bottom: 6px; cursor: pointer; background: var(--panel-2); }
+  .scan:hover { border-color: var(--line); background: var(--panel-3); }
+  .scan.active { border-color: var(--accent); }
+  .scan .id { font-size: 12px; font-weight: 600; }
+  .scan .sub { font-size: 11px; color: var(--faint); }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+  .dot.running { background: var(--medium); animation: pulse 1.2s infinite; }
+  .dot.complete { background: var(--accent); } .dot.failed { background: var(--critical); }
+  @keyframes pulse { 50% { opacity: .2; } }
+
+  input, select, textarea {
+    width: 100%; background: var(--panel-2); color: var(--fg); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 7px 9px; font: inherit; font-size: 13px;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+          color: var(--faint); margin: 11px 0 4px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 3px; }
+  .check { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--fg-dim);
+           text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer; }
+  .check input { width: auto; accent-color: var(--accent); }
+  .warn { border-left: 2px solid var(--medium); background: var(--panel-2); padding: 8px 11px;
+          border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 12.5px; margin: 11px 0;
+          color: var(--fg-dim); }
+  .warn.bad { border-left-color: var(--critical); }
+  .warn.good { border-left-color: var(--accent); }
+
+  .drawer { position: fixed; inset: 0 0 0 auto; width: min(660px, 100%); background: var(--panel);
+            border-left: 1px solid var(--line); padding: 18px; overflow: auto; z-index: 50;
+            box-shadow: -24px 0 60px rgba(0,0,0,.6); display: none; }
+  .drawer.open { display: block; }
+  .drawer h3 { margin: 0 0 10px; font-size: 16px; }
+  .kv { display: grid; grid-template-columns: 128px 1fr; gap: 4px 10px; font-size: 13px; margin: 10px 0; }
+  .kv dt { color: var(--faint); } .kv dd { margin: 0; word-break: break-word; }
+  .evidence { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
+              padding: 9px; font-size: 12.5px; white-space: pre-wrap; word-break: break-word;
+              font-family: var(--mono); color: var(--fg-dim); }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .filters input, .filters select { width: auto; min-width: 150px; }
+  .empty { color: var(--faint); padding: 26px; text-align: center; font-size: 13px; }
+  .scroll { max-height: 70vh; overflow: auto; }
+  .links a { display: inline-block; margin: 2px 8px 2px 0; font-size: 12px; }
+  .progress { font-size: 11.5px; color: var(--muted); max-height: 170px; overflow: auto;
+              font-family: var(--mono); }
+
+  /* live + screenshot wall */
+  .wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .frame { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+           background: #000; }
+  .frame .view { position: relative; aspect-ratio: 16 / 9; background: #000;
+                 display: grid; place-items: center; }
+  .frame .view img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .frame .view .ph { color: var(--faint); font-size: 12px; text-align: center; padding: 10px;
+                     font-family: var(--mono); }
+  .frame .bar { display: flex; align-items: center; gap: 6px; padding: 7px 9px;
+                background: var(--panel); border-top: 1px solid var(--line); font-size: 11.5px; }
+  .frame .bar .host { font-family: var(--mono); color: var(--fg-dim); }
+  .frame .bar .spacer { flex: 1; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--record);
+              animation: pulse 1.1s infinite; display: inline-block; }
+  .cmd { font-family: var(--mono); font-size: 11.5px; background: var(--panel-2);
+         border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px;
+         color: var(--fg-dim); word-break: break-all; margin: 4px 0; }
+</style>
+</head>
+<body>
+<header>
+  <a class="lockup" href="/" title="KAMSTRIKE">
+    <img class="mark" src="/icon.svg" alt="">
+    <img class="word" src="/wordmark.svg" alt="KAMSTRIKE">
+  </a>
+  <span class="meta" id="meta">loading…</span>
+  <span class="spacer"></span>
+  <nav>
+    <button data-view="scans" class="active">Scans</button>
+    <button data-view="live">Live &amp; shots</button>
+    <button data-view="exploits">Exploits</button>
+    <button data-view="new">New scan</button>
+    <button data-view="vendors">Vendors</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============================================================ scans -->
+  <section id="view-scans" class="layout">
+    <div>
+      <div class="card">
+        <h2>Scans <button class="btn sm" id="refresh" style="float:right">refresh</button></h2>
+        <div id="scanlist"><div class="empty">no scans yet</div></div>
+      </div>
+      <div class="card" id="progress-card" style="display:none">
+        <h2>Progress</h2><div class="progress" id="progress"></div>
+      </div>
+      <div class="card" id="engagement-card" style="display:none">
+        <h2>Engagement</h2><dl class="kv" id="engagement"></dl>
+        <div class="links" id="downloads"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card"><h2>Summary</h2><div class="tiles" id="tiles"></div></div>
+      <div class="card">
+        <h2>Devices</h2>
+        <div class="filters">
+          <input id="f-device" placeholder="filter host / vendor / model…">
+          <select id="f-sev"><option value="">any severity</option>
+            <option value="critical">critical</option><option value="high">high+</option>
+            <option value="medium">medium+</option></select>
+          <select id="f-vendor"><option value="">any vendor</option></select>
+        </div>
+        <div class="scroll"><table id="devices">
+          <thead><tr><th data-k="host">Host</th><th data-k="vendor">Vendor</th>
+          <th data-k="device_type">Type</th><th data-k="model">Model</th>
+          <th data-k="firmware">Firmware</th><th>Ports</th><th>Media</th>
+          <th data-k="max_severity">Worst</th><th>Findings</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h2>Findings</h2>
+        <div class="filters">
+          <input id="f-finding" placeholder="filter title / cve / host…">
+          <select id="f-conf"><option value="">any confidence</option>
+            <option value="confirmed">confirmed only</option>
+            <option value="possible">candidates only</option></select>
+        </div>
+        <div class="scroll"><table id="findings">
+          <thead><tr><th data-k="severity">Sev</th><th data-k="host">Host</th>
+          <th data-k="confidence">Conf</th><th data-k="title">Finding</th>
+          <th>CVE</th><th data-k="source">Source</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================== live & shots -->
+  <section id="view-live" style="display:none">
+    <div class="card">
+      <h2>Live media</h2>
+      <div class="warn">
+        Frames are pulled by <b>your browser directly from the device</b>, so this only works
+        from a host that can reach it. MJPEG and snapshot endpoints render here; RTSP and RTMP
+        cannot play in a browser, so those tiles give you a player command to copy.
+      </div>
+      <div class="filters">
+        <input id="f-live" placeholder="filter host / vendor…">
+        <label class="check"><input type="checkbox" id="f-live-verified">
+          verified endpoints only</label>
+        <button class="btn sm" id="live-refresh">refresh frames</button>
+        <label class="check"><input type="checkbox" id="live-auto"> auto-refresh snapshots (5s)</label>
+      </div>
+      <div class="wall" id="livewall"></div>
+    </div>
+    <div class="card">
+      <h2>Screenshots</h2>
+      <div class="wall" id="shotwall"></div>
+    </div>
+  </section>
+
+  <!-- ========================================================= exploits -->
+  <section id="view-exploits" class="layout" style="display:none">
+    <div>
+      <div class="card">
+        <h2>Catalogue</h2>
+        <div id="exploit-stats" class="tiles"></div>
+      </div>
+      <div class="card">
+        <h2>Legend</h2>
+        <p style="font-size:12.5px;color:var(--muted);margin:0">
+          <span class="tag ok">read-only</span> runs by default and changes nothing.<br>
+          <span class="tag warn">--exploit</span> executes commands or writes files; off unless
+          you ask for it.<br>
+          <span class="tag">advisory</span> has no safe remote test; verify from the console.<br>
+          <span class="tag live">in the wild</span> is actively exploited today.
+        </p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Exploits and checks</h2>
+        <div class="filters">
+          <input id="f-ex" placeholder="filter id / cve / vendor / title…">
+          <select id="f-ex-sev"><option value="">any severity</option></select>
+          <select id="f-ex-vendor"><option value="">any vendor</option></select>
+          <label class="check"><input type="checkbox" id="f-ex-wild"> in the wild</label>
+          <label class="check"><input type="checkbox" id="f-ex-intrusive"> intrusive only</label>
+        </div>
+        <div class="scroll"><table id="extable">
+          <thead><tr><th data-k="severity">Sev</th><th data-k="id">Entry</th>
+          <th>Vendors</th><th>CVE</th><th>Verification</th><th>Flags</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================== new scan -->
+  <section id="view-new" style="display:none">
+    <div class="card" style="max-width:880px">
+      <h2>Launch a scan</h2>
+      <div class="warn">
+        KAMSTRIKE actively tests devices. Only scan equipment you own or have written
+        permission to assess. Every run is recorded in <code>engagement.json</code>.
+      </div>
+      <label>Targets (IP, CIDR, 10.0.0.1-50 range, hostname — comma or space separated)</label>
+      <textarea id="n-targets" rows="2" placeholder="192.168.1.0/24, 10.0.5.10"></textarea>
+      <div class="row">
+        <div><label>Authorization reference</label><input id="n-ref" placeholder="ENG-2214"></div>
+        <div><label>Operator</label><input id="n-operator" placeholder="your name"></div>
+      </div>
+      <div class="row">
+        <div><label>Port profile</label><select id="n-profile"></select></div>
+        <div><label>Explicit ports (overrides profile)</label>
+             <input id="n-ports" placeholder="80,443,8000"></div>
+      </div>
+      <div class="row">
+        <div><label>Minimum severity</label><select id="n-sev"></select></div>
+        <div><label>Credential attempts per surface</label>
+             <input id="n-creds-n" type="number" value="8" min="0" max="40"></div>
+      </div>
+      <label>Scope file (optional allow-list path on the server)</label>
+      <input id="n-scope" placeholder="/path/to/scope.txt">
+      <label>Stages</label>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="n-checks" checked> vendor checks</label>
+        <label class="check"><input type="checkbox" id="n-nuclei" checked> nuclei templates</label>
+        <label class="check"><input type="checkbox" id="n-creds" checked> default credentials</label>
+        <label class="check"><input type="checkbox" id="n-streams" checked> media discovery</label>
+        <label class="check"><input type="checkbox" id="n-login" checked> login surfaces</label>
+        <label class="check"><input type="checkbox" id="n-shots"> screenshots</label>
+        <label class="check"><input type="checkbox" id="n-geoip"> geolocation lookup</label>
+        <label class="check"><input type="checkbox" id="n-large"> allow large sweep</label>
+        <label class="check"><input type="checkbox" id="n-public"> allow public targets</label>
+      </div>
+      <div class="warn bad">
+        <label class="check"><input type="checkbox" id="n-exploit"> <b>--exploit</b>: allow
+        state-changing verification (command execution, marker files). Off by default.</label>
+      </div>
+      <div class="warn good">
+        <label class="check"><input type="checkbox" id="n-authorized">
+        <b>I am authorized to assess these targets.</b></label>
+      </div>
+      <label>Dashboard token (printed when the server started)</label>
+      <input id="n-token" placeholder="paste token">
+      <p><button class="btn primary" id="launch">Start scan</button>
+         <span id="launch-msg" class="meta"></span></p>
+    </div>
+  </section>
+
+  <!-- ============================================================ vendors -->
+  <section id="view-vendors" style="display:none">
+    <div class="card">
+      <h2>Fingerprint database</h2>
+      <div class="scroll"><table id="vendortable">
+        <thead><tr><th>Vendor</th><th>Device types</th><th>Rules</th><th>Aliases</th>
+        <th>Applicable entries</th></tr></thead><tbody></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+
+<div class="drawer" id="drawer"></div>
+
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const SEV_RANK = { info: 0, low: 1, medium: 2, high: 3, critical: 4 };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pill = (s) => `<span class="pill ${esc(s)}">${esc(String(s).toUpperCase())}</span>`;
+const VIEWS = ['scans', 'live', 'exploits', 'new', 'vendors'];
+
+const state = { meta: null, scans: [], scanId: null, report: null, exploits: [],
+                poll: null, livePoll: null, sort: {} };
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const text = await res.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { error: text.slice(0, 400) }; }
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data });
+  return data;
+}
+
+function show(view) {
+  $$('nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  VIEWS.forEach((v) => {
+    const el = $('#view-' + v);
+    el.style.display = v === view ? (el.classList.contains('layout') ? 'grid' : 'block') : 'none';
+  });
+  if (view === 'exploits' && !state.exploits.length) loadExploits();
+  if (view === 'vendors') loadVendors();
+  if (view === 'live') renderLive();
+}
+$$('nav button').forEach((b) => b.addEventListener('click', () => show(b.dataset.view)));
+
+/* ------------------------------------------------------------------- meta */
+async function loadMeta() {
+  const m = state.meta = await api('/api/meta');
+  $('#meta').innerHTML =
+    `v${esc(m.version)} · ${m.counts.vendors} vendors · ${m.counts.kb_entries} entries · ` +
+    `${m.counts.cves} CVEs · ${m.counts.credentials} default creds<br>` +
+    `nuclei ${m.nuclei.available ? `ready · ${m.nuclei.bundled} bundled templates`
+      : '<span style="color:var(--high)">not installed</span>'} · ` +
+    `screenshots ${m.screenshots.available ? 'ready' :
+      '<span style="color:var(--high)">' + esc(m.screenshots.reason) + '</span>'}`;
+  $('#n-profile').innerHTML = Object.entries(m.profiles)
+    .map(([k, n]) => `<option value="${esc(k)}">${esc(k)} — ${n} ports</option>`).join('');
+  $('#n-sev').innerHTML = m.severities
+    .map((s) => `<option value="${esc(s)}"${s === 'info' ? ' selected' : ''}>${esc(s)}</option>`).join('');
+  $('#f-ex-sev').innerHTML = '<option value="">any severity</option>' +
+    m.severities.slice().reverse().map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  if (!m.screenshots.available) {
+    $('#n-shots').disabled = true;
+    $('#n-shots').parentElement.title = m.screenshots.reason;
+  }
+}
+
+/* ------------------------------------------------------------------ scans */
+async function loadScans() {
+  state.scans = await api('/api/scans');
+  const list = $('#scanlist');
+  if (!state.scans.length) { list.innerHTML = '<div class="empty">no scans yet</div>'; return; }
+  list.innerHTML = state.scans.map((s) => {
+    const sev = (s.stats || {}).by_severity || {};
+    const counts = ['critical', 'high'].map((k) => sev[k] ? `${sev[k]} ${k}` : '')
+      .filter(Boolean).join(', ');
+    const targets = ((s.engagement || {}).targets || s.targets || []).join(', ');
+    return `<div class="scan ${s.id === state.scanId ? 'active' : ''}" data-id="${esc(s.id)}">
+      <div class="id"><span class="dot ${esc(s.state)}"></span>${esc(s.id)}</div>
+      <div class="sub">${esc(targets.slice(0, 46)) || '—'}</div>
+      <div class="sub">${s.state === 'running' ? 'running…'
+        : (counts || `${(s.stats || {}).findings_total ?? 0} findings`)}</div></div>`;
+  }).join('');
+  $$('#scanlist .scan').forEach((el) =>
+    el.addEventListener('click', () => selectScan(el.dataset.id)));
+  if (!state.scanId && state.scans.length) selectScan(state.scans[0].id);
+}
+
+async function selectScan(id) {
+  state.scanId = id;
+  $$('#scanlist .scan').forEach((el) => el.classList.toggle('active', el.dataset.id === id));
+  const data = await api('/api/scans/' + encodeURIComponent(id));
+  if (data.devices) { state.report = data; renderReport(); }
+  else { state.report = null; renderPending(data); }
+  pollStatus();
+}
+
+function renderPending(status) {
+  $('#tiles').innerHTML = status.error
+    ? `<div class="warn bad">${esc(status.error)}</div>`
+    : `<div class="empty">scan ${esc(status.state || '')}…</div>`;
+  ['#devices tbody', '#findings tbody'].forEach((s) => { $(s).innerHTML = ''; });
+  $('#engagement-card').style.display = 'none';
+}
+
+function pollStatus() {
+  clearInterval(state.poll);
+  const scan = state.scans.find((s) => s.id === state.scanId);
+  if (!scan || scan.state !== 'running') { $('#progress-card').style.display = 'none'; return; }
+  $('#progress-card').style.display = 'block';
+  const tick = async () => {
+    try {
+      const st = await api(`/api/scans/${encodeURIComponent(state.scanId)}/status`);
+      $('#progress').innerHTML = (st.progress || []).slice(-26).reverse().map((p) => {
+        const rest = Object.entries(p).filter(([k]) => k !== 'stage' && k !== 'at')
+          .map(([k, v]) => `${k}=${v}`).join(' ');
+        return `<div><span style="color:var(--accent)">${esc(p.stage)}</span> ${esc(rest)}</div>`;
+      }).join('') || '<div>starting…</div>';
+      if (st.state !== 'running') {
+        clearInterval(state.poll); await loadScans(); await selectScan(state.scanId);
+      }
+    } catch (_) { clearInterval(state.poll); }
+  };
+  tick();
+  state.poll = setInterval(tick, 2500);
+}
+
+function renderReport() {
+  const r = state.report, st = r.stats || {}, sev = st.by_severity || {};
+  const tile = (n, l, color) =>
+    `<div class="tile"><div class="n"${color ? ` style="color:var(--${color})"` : ''}>${n}</div>
+     <div class="l">${esc(l)}</div></div>`;
+  $('#tiles').innerHTML = [
+    tile(sev.critical || 0, 'critical', 'critical'), tile(sev.high || 0, 'high', 'high'),
+    tile(sev.medium || 0, 'medium', 'medium'), tile(sev.low || 0, 'low', 'low'),
+    tile(st.hosts_responding ?? 0, 'responding'), tile(st.devices_identified ?? 0, 'identified'),
+    tile(st.credentials_found ?? 0, 'credentials', 'accent'),
+    tile(st.streams_found ?? 0, 'live media', 'accent'),
+    tile(st.stream_leads ?? 0, 'media leads'), tile(st.login_surfaces ?? 0, 'login surfaces'),
+    tile(st.screenshots ?? 0, 'screenshots'),
+  ].join('');
+
+  const eng = r.engagement || {};
+  $('#engagement-card').style.display = 'block';
+  $('#engagement').innerHTML = [
+    ['operator', eng.operator], ['reference', eng.authorization_reference || '—'],
+    ['scope', (eng.targets || []).join(', ')], ['hosts', eng.target_count],
+    ['started', eng.started_at_iso], ['duration', (r.duration_sec ?? 0) + 's'],
+    ['scope file', eng.scope_file || '—'],
+  ].map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  const id = encodeURIComponent(state.scanId);
+  $('#downloads').innerHTML = ['report.html', 'report.md', 'findings.csv', 'engagement.json']
+    .map((f) => `<a href="/api/scans/${id}/${f}" target="_blank">${f}</a>`).join('');
+
+  const vendors = Array.from(new Set(r.devices.map((d) => d.vendor).filter(Boolean))).sort();
+  $('#f-vendor').innerHTML = '<option value="">any vendor</option>' +
+    vendors.map((v) => `<option>${esc(v)}</option>`).join('');
+
+  renderDevices(); renderFindings(); renderLive();
+}
+
+const devices = () => (state.report?.devices || []).filter((d) => (d.open_ports || []).length);
+
+function renderDevices() {
+  const q = $('#f-device').value.toLowerCase();
+  const minSev = $('#f-sev').value, vendor = $('#f-vendor').value;
+  let rows = devices().filter((d) => {
+    if (vendor && d.vendor !== vendor) return false;
+    if (minSev && SEV_RANK[d.max_severity] < SEV_RANK[minSev]) return false;
+    if (!q) return true;
+    return [d.host, d.vendor, d.model, d.firmware, d.device_type].join(' ').toLowerCase().includes(q);
+  });
+  rows = sortRows(rows, 'devices', (d, k) => k === 'max_severity' ? SEV_RANK[d.max_severity] : d[k]);
+  $('#devices tbody').innerHTML = rows.length ? rows.map((d, i) => {
+    const live = (d.streams || []).filter((s) => s.verified).length;
+    return `<tr data-i="${i}"><td class="mono">${esc(d.host)}</td>
+      <td>${esc(d.vendor || '—')}</td><td>${esc(d.device_type || '—')}</td>
+      <td>${esc(d.model || '—')}</td><td class="mono">${esc(d.firmware || '—')}</td>
+      <td class="mono">${esc((d.open_ports || []).join(', '))}</td>
+      <td>${live ? `<span class="tag live">${live} live</span>` : ''}
+          ${(d.streams || []).length - live || ''}</td>
+      <td>${pill(d.max_severity)}</td><td>${(d.findings || []).length}</td></tr>`;
+  }).join('') : '<tr><td colspan="9" class="empty">no devices match</td></tr>';
+  $$('#devices tbody tr[data-i]').forEach((tr) =>
+    tr.addEventListener('click', () => openDevice(rows[+tr.dataset.i])));
+}
+
+const allFindings = () => (state.report?.devices || [])
+  .flatMap((d) => (d.findings || []).map((f) => ({ ...f, _device: d })));
+
+function renderFindings() {
+  const q = $('#f-finding').value.toLowerCase(), conf = $('#f-conf').value;
+  let rows = allFindings().filter((f) => {
+    if (conf && f.confidence !== conf) return false;
+    if (!q) return true;
+    return [f.title, f.host, (f.cve || []).join(' '), f.source].join(' ').toLowerCase().includes(q);
+  });
+  rows = sortRows(rows, 'findings', (f, k) => k === 'severity' ? SEV_RANK[f.severity] : f[k], true);
+  $('#findings tbody').innerHTML = rows.length ? rows.map((f, i) => `
+    <tr data-i="${i}"><td>${pill(f.severity)}</td>
+    <td class="mono">${esc(f.host)}${f.port ? ':' + f.port : ''}</td>
+    <td>${esc(f.confidence)}</td><td>${esc(f.title)}</td>
+    <td class="mono">${esc((f.cve || []).join(', '))}</td>
+    <td class="mono">${esc(f.source)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">no findings match</td></tr>';
+  $$('#findings tbody tr[data-i]').forEach((tr) =>
+    tr.addEventListener('click', () => openFinding(rows[+tr.dataset.i])));
+}
+
+/* -------------------------------------------------------------- live wall */
+function liveEndpoints() {
+  const q = $('#f-live').value.toLowerCase();
+  const verifiedOnly = $('#f-live-verified').checked;
+  return (state.report?.devices || []).flatMap((d) =>
+    (d.streams || []).map((s) => ({ ...s, host: d.host, vendor: d.vendor, model: d.model })))
+    .filter((s) => {
+      if (verifiedOnly && !s.verified) return false;
+      if (!q) return true;
+      return [s.host, s.vendor, s.url, s.protocol].join(' ').toLowerCase().includes(q);
+    });
+}
+
+function playerCommand(url) {
+  return `ffplay -rtsp_transport tcp "${url}"   # or: vlc "${url}"`;
+}
+
+function renderLive() {
+  const eps = liveEndpoints();
+  const bust = Date.now();
+  $('#livewall').innerHTML = eps.length ? eps.map((s, i) => {
+    const browserPlayable = s.protocol === 'http-mjpeg' || s.protocol === 'http-snapshot';
+    const view = browserPlayable
+      ? `<img data-src="${esc(s.url)}" src="${esc(s.url)}${s.url.includes('?') ? '&' : '?'}_=${bust}"
+             alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),
+             {className:'ph',textContent:'frame unavailable from this browser'}))">`
+      : `<div class="ph">${esc(s.protocol.toUpperCase())} cannot play in a browser<br>
+         use the player command below</div>`;
+    return `<div class="frame" data-i="${i}">
+      <div class="view">${view}</div>
+      <div class="bar">
+        ${s.verified ? '<span class="live-dot"></span>' : ''}
+        <span class="host">${esc(s.host)}</span>
+        <span class="tag">${esc(s.protocol)}</span>
+        ${s.verified ? '<span class="tag ok">verified</span>' : '<span class="tag">lead</span>'}
+        <span class="spacer"></span>
+        <button class="btn sm" data-copy="${esc(s.url)}">copy url</button>
+        <a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noreferrer">open</a>
+      </div></div>`;
+  }).join('') : '<div class="empty">no media endpoints in this scan</div>';
+
+  $$('#livewall .frame').forEach((el) => {
+    const s = eps[+el.dataset.i];
+    el.querySelector('.view').addEventListener('click', () => openStream(s));
+  });
+  $$('#livewall [data-copy]').forEach((b) => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(b.dataset.copy);
+    b.textContent = 'copied';
+    setTimeout(() => { b.textContent = 'copy url'; }, 1200);
+  }));
+
+  const shots = (state.report?.devices || []).flatMap((d) =>
+    (d.screenshots || []).map((s) => ({ ...s, host: d.host, vendor: d.vendor })));
+  const id = encodeURIComponent(state.scanId);
+  $('#shotwall').innerHTML = shots.length ? shots.map((s) => `
+    <div class="frame"><div class="view">
+      <a href="/api/scans/${id}/screenshots/${encodeURIComponent(s.file)}" target="_blank">
+      <img loading="lazy" src="/api/scans/${id}/screenshots/${encodeURIComponent(s.file)}" alt="">
+      </a></div>
+      <div class="bar"><span class="host">${esc(s.host)}</span>
+      <span class="tag">${esc(s.vendor || '?')}</span><span class="spacer"></span>
+      <span style="color:var(--faint)">${esc((s.title || '').slice(0, 30))}</span></div></div>`).join('')
+    : '<div class="empty">no screenshots in this scan — run with the screenshots stage enabled</div>';
+}
+
+function openStream(s) {
+  const browserPlayable = s.protocol === 'http-mjpeg' || s.protocol === 'http-snapshot';
+  $('#drawer').innerHTML = `
+    <button class="btn" style="float:right" onclick="closeDrawer()">close</button>
+    <h3>${esc(s.host)} — ${esc(s.protocol)}</h3>
+    <dl class="kv">
+      <dt>url</dt><dd class="mono">${esc(s.url)}</dd>
+      <dt>state</dt><dd>${s.verified ? 'verified open' : 'unverified lead'}</dd>
+      <dt>auth</dt><dd>${s.authenticated ? 'credentials required' : 'none required'}</dd>
+      <dt>note</dt><dd>${esc(s.note || '—')}</dd>
+    </dl>
+    ${browserPlayable
+      ? `<div class="frame"><div class="view"><img src="${esc(s.url)}" alt=""></div></div>`
+      : `<h2>Play it</h2><div class="cmd">${esc(playerCommand(s.url))}</div>`}
+    <h2>Record a sample</h2>
+    <div class="cmd">ffmpeg -rtsp_transport tcp -i "${esc(s.url)}" -t 10 -c copy evidence.mp4</div>`;
+  $('#drawer').classList.add('open');
+}
+
+$('#live-refresh').addEventListener('click', renderLive);
+['#f-live', '#f-live-verified'].forEach((s) => $(s).addEventListener('input', renderLive));
+$('#live-auto').addEventListener('change', (e) => {
+  clearInterval(state.livePoll);
+  if (e.target.checked) state.livePoll = setInterval(() => {
+    $$('#livewall img[data-src]').forEach((img) => {
+      const base = img.dataset.src;
+      img.src = base + (base.includes('?') ? '&' : '?') + '_=' + Date.now();
+    });
+  }, 5000);
+});
+
+/* ------------------------------------------------------------------ sort */
+function sortRows(rows, table, pick, sevDefault) {
+  const s = state.sort[table] ||
+    (sevDefault ? { k: 'severity', dir: -1 } : { k: 'max_severity', dir: -1 });
+  return rows.slice().sort((a, b) => {
+    const av = pick(a, s.k), bv = pick(b, s.k);
+    if (av === bv) return 0;
+    return (av > bv ? 1 : -1) * s.dir;
+  });
+}
+const SORTABLE = { devices: renderDevices, findings: renderFindings, extable: renderExploits };
+Object.entries(SORTABLE).forEach(([t, render]) => {
+  $$(`#${t} th[data-k]`).forEach((th) => th.addEventListener('click', () => {
+    const cur = state.sort[t] || {};
+    state.sort[t] = { k: th.dataset.k, dir: cur.k === th.dataset.k ? -(cur.dir || 1) : 1 };
+    render();
+  }));
+});
+
+/* ---------------------------------------------------------------- drawer */
+function closeDrawer() { $('#drawer').classList.remove('open'); }
+window.closeDrawer = closeDrawer;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+
+function openFinding(f) {
+  const d = f._device || {};
+  const cves = (f.cve || []).map((c) =>
+    `<a href="https://nvd.nist.gov/vuln/detail/${esc(c)}" target="_blank">${esc(c)}</a>`).join(' ');
+  $('#drawer').innerHTML = `
+    <button class="btn" style="float:right" onclick="closeDrawer()">close</button>
+    <h3>${pill(f.severity)} ${esc(f.title)}</h3>
+    <dl class="kv">
+      <dt>host</dt><dd class="mono">${esc(f.host)}${f.port ? ':' + f.port : ''}</dd>
+      <dt>confidence</dt><dd>${esc(f.confidence)}</dd>
+      <dt>source</dt><dd class="mono">${esc(f.source)}</dd>
+      <dt>cve</dt><dd>${cves || '—'}</dd>
+      <dt>device</dt><dd>${esc(d.vendor || '?')} ${esc(d.model || '')} ${esc(d.firmware || '')}</dd>
+      <dt>matched at</dt><dd class="mono">${esc(f.matched_at || '—')}</dd>
+      <dt>tags</dt><dd>${(f.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</dd>
+    </dl>
+    <h2>Evidence</h2><div class="evidence">${esc(f.evidence || '—')}</div>
+    ${f.remediation ? `<h2>Remediation</h2><div class="evidence">${esc(f.remediation)}</div>` : ''}
+    ${Object.keys(f.extra || {}).length
+      ? `<h2>Detail</h2><div class="evidence">${esc(JSON.stringify(f.extra, null, 2))}</div>` : ''}
+    ${(f.references || []).length ? `<h2>References</h2><div class="links">${
+      (f.references || []).map((r) => `<a href="${esc(r)}" target="_blank">${esc(r)}</a>`)
+        .join('<br>')}</div>` : ''}`;
+  $('#drawer').classList.add('open');
+}
+
+function openDevice(d) {
+  const list = (items) => items.length ? `<ul style="padding-left:18px;margin:6px 0">${
+    items.join('')}</ul>` : '';
+  const creds = list((d.credentials || []).map((c) =>
+    `<li class="mono">${esc(c.username)}:${esc(c.password || '<empty>')} — ${esc(c.service)}${
+      c.port ? ':' + c.port : ''} <span class="tag">${esc(c.note || '')}</span></li>`));
+  const streams = list((d.streams || []).map((s) =>
+    `<li class="mono">${esc(s.url)} <span class="tag">${esc(s.protocol)}</span>
+     <span class="tag ${s.verified ? 'ok' : ''}">${s.verified ? 'verified' : 'lead'}</span></li>`));
+  const logins = list((d.login_surfaces || []).map((l) =>
+    `<li class="mono">${l.status} ${esc(l.scheme)} ${esc(l.url)}${
+      l.realm ? ` <span class="tag">realm ${esc(l.realm)}</span>` : ''}</li>`));
+  const svc = list((d.services || []).map((s) =>
+    `<li class="mono">${s.port}/${esc(s.proto)} ${esc(s.name)}${
+      s.http_status ? ' · HTTP ' + s.http_status : ''}${
+      s.http_server ? ' · ' + esc(s.http_server) : ''}${
+      s.http_title ? ' · ' + esc(s.http_title) : ''}</li>`));
+  const osint = Object.entries(d.osint || {})
+    .map(([k, v]) => `<a href="${esc(v)}" target="_blank" rel="noreferrer">${esc(k)}</a>`).join('');
+  const intel = d.intel && d.intel.ip ? `<dl class="kv">
+    <dt>location</dt><dd>${esc(d.intel.location || '—')}</dd>
+    <dt>org</dt><dd>${esc(d.intel.org || '—')}</dd>
+    <dt>asn</dt><dd>${esc(d.intel.asn || '—')}</dd>
+    ${Object.entries(d.intel.map_links || {}).map(([k, v]) =>
+      `<dt>${esc(k)}</dt><dd><a href="${esc(v)}" target="_blank">open</a></dd>`).join('')}</dl>` : '';
+  $('#drawer').innerHTML = `
+    <button class="btn" style="float:right" onclick="closeDrawer()">close</button>
+    <h3>${esc(d.host)} — ${esc(d.vendor || 'unidentified')}</h3>
+    <dl class="kv">
+      <dt>type</dt><dd>${esc(d.device_type || '—')}</dd>
+      <dt>model</dt><dd>${esc(d.model || '—')}</dd>
+      <dt>firmware</dt><dd class="mono">${esc(d.firmware || '—')}</dd>
+      <dt>serial</dt><dd class="mono">${esc(d.serial || '—')}</dd>
+      <dt>confidence</dt><dd>${esc(d.vendor_confidence ?? '—')}</dd>
+      <dt>worst</dt><dd>${pill(d.max_severity)}</dd>
+      <dt>fingerprint</dt><dd>${(d.fingerprint_reasons || [])
+        .map((r) => `<span class="tag">${esc(r)}</span>`).join('')}</dd>
+    </dl>
+    ${svc ? '<h2>Services</h2>' + svc : ''}
+    ${creds ? '<h2>Credentials recovered</h2>' + creds : ''}
+    ${streams ? '<h2>Media endpoints</h2>' + streams : ''}
+    ${logins ? '<h2>Authentication surfaces</h2>' + logins : ''}
+    ${intel ? '<h2>IP intelligence</h2>' + intel : ''}
+    ${osint ? `<h2>Pivot links</h2><div class="links">${osint}</div>` : ''}
+    ${(d.errors || []).length
+      ? `<h2>Errors</h2><div class="evidence">${esc(d.errors.join('\n'))}</div>` : ''}`;
+  $('#drawer').classList.add('open');
+}
+
+/* -------------------------------------------------------------- exploits */
+async function loadExploits() {
+  state.exploits = await api('/api/exploits');
+  const vendors = Array.from(new Set(state.exploits.flatMap((e) => e.vendors)))
+    .filter((v) => v !== '*').sort();
+  $('#f-ex-vendor').innerHTML = '<option value="">any vendor</option>' +
+    vendors.map((v) => `<option>${esc(v)}</option>`).join('');
+  const total = state.exploits.length;
+  const tile = (n, l, color) =>
+    `<div class="tile"><div class="n"${color ? ` style="color:var(--${color})"` : ''}>${n}</div>
+     <div class="l">${esc(l)}</div></div>`;
+  $('#exploit-stats').innerHTML = [
+    tile(total, 'entries'),
+    tile(new Set(state.exploits.flatMap((e) => e.cves)).size, 'cves'),
+    tile(state.exploits.filter((e) => e.wild).length, 'in the wild', 'critical'),
+    tile(state.exploits.filter((e) => e.intrusive).length, 'intrusive', 'high'),
+    tile(state.exploits.filter((e) => e.check && !e.intrusive).length, 'read-only', 'accent'),
+    tile(state.exploits.reduce((n, e) => n + e.templates.length, 0), 'templates'),
+  ].join('');
+  renderExploits();
+}
+
+function renderExploits() {
+  const q = $('#f-ex').value.toLowerCase(), sev = $('#f-ex-sev').value;
+  const vendor = $('#f-ex-vendor').value;
+  const wild = $('#f-ex-wild').checked, intrusive = $('#f-ex-intrusive').checked;
+  let rows = state.exploits.filter((e) => {
+    if (sev && e.severity !== sev) return false;
+    if (vendor && !e.vendors.includes(vendor)) return false;
+    if (wild && !e.wild) return false;
+    if (intrusive && !e.intrusive) return false;
+    if (!q) return true;
+    return [e.id, e.title, e.cves.join(' '), e.vendors.join(' '), e.check]
+      .join(' ').toLowerCase().includes(q);
+  });
+  rows = sortRows(rows, 'extable', (e, k) => k === 'severity' ? SEV_RANK[e.severity] : e[k], true);
+  $('#extable tbody').innerHTML = rows.length ? rows.map((e, i) => `
+    <tr data-i="${i}"><td>${pill(e.severity)}</td>
+    <td><div>${esc(e.title.slice(0, 58))}</div>
+        <div class="mono" style="color:var(--faint)">${esc(e.id)}</div></td>
+    <td>${esc(e.vendors.join(', '))}${e.stacks.length
+      ? ` <span class="tag">${esc(e.stacks.join(','))}</span>` : ''}</td>
+    <td class="mono">${esc(e.cves.join(', ')) || '—'}</td>
+    <td style="font-size:12px;color:var(--muted)">${esc(e.verification)}</td>
+    <td>${e.intrusive ? '<span class="tag warn">--exploit</span>' : ''}
+        ${e.advisory ? '<span class="tag">advisory</span>' : ''}
+        ${e.wild ? '<span class="tag live">in the wild</span>' : ''}
+        ${e.check && !e.intrusive ? '<span class="tag ok">read-only</span>' : ''}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">no entries match</td></tr>';
+  $$('#extable tbody tr[data-i]').forEach((tr) =>
+    tr.addEventListener('click', () => openExploit(rows[+tr.dataset.i])));
+}
+
+function openExploit(e) {
+  const templates = e.templates.map((t) =>
+    `<span class="tag ${t.bundled ? 'ok' : ''}">${esc(t.id)}${
+      t.bundled ? ' · bundled' : ' · from your template store'}</span>`).join('') || '—';
+  $('#drawer').innerHTML = `
+    <button class="btn" style="float:right" onclick="closeDrawer()">close</button>
+    <h3>${pill(e.severity)} ${esc(e.title)}</h3>
+    <dl class="kv">
+      <dt>id</dt><dd class="mono">${esc(e.id)}</dd>
+      <dt>cve</dt><dd>${e.cves.map((c) =>
+        `<a href="https://nvd.nist.gov/vuln/detail/${esc(c)}" target="_blank">${esc(c)}</a>`)
+        .join(' ') || '—'}</dd>
+      <dt>vendors</dt><dd>${esc(e.vendors.join(', '))}${
+        e.stacks.length ? ' + ' + esc(e.stacks.join(', ')) : ''}</dd>
+      <dt>affected</dt><dd>${esc(e.affected || '—')}</dd>
+      <dt>verification</dt><dd>${esc(e.verification)}</dd>
+      <dt>local check</dt><dd class="mono">${esc(e.check || '—')}${
+        e.check_description ? `<br><span style="color:var(--faint)">${
+          esc(e.check_description)}</span>` : ''}</dd>
+      <dt>templates</dt><dd>${templates}</dd>
+    </dl>
+    <h2>What it is</h2><div class="evidence">${esc(e.description)}</div>
+    <h2>Remediation</h2><div class="evidence">${esc(e.remediation || '—')}</div>
+    <h2>Run just this entry</h2>
+    <div class="cmd">kamstrike scan &lt;target&gt; --authorized --only ${esc(e.id)}${
+      e.intrusive ? ' --exploit' : ''}</div>
+    ${e.references.length ? `<h2>References</h2><div class="links">${
+      e.references.map((r) => `<a href="${esc(r)}" target="_blank">${esc(r)}</a>`)
+        .join('<br>')}</div>` : ''}`;
+  $('#drawer').classList.add('open');
+}
+
+/* --------------------------------------------------------------- vendors */
+async function loadVendors() {
+  const vs = await api('/api/vendors');
+  $('#vendortable tbody').innerHTML = vs.map((v) => `<tr>
+    <td>${esc(v.name)}</td><td>${esc(v.device_types.join(', '))}</td><td>${v.rules}</td>
+    <td class="mono" style="color:var(--faint)">${esc(v.aliases.join(', '))}</td>
+    <td>${v.entries.map((e) => `<span class="tag">${esc(e)}</span>`).join('')}</td></tr>`).join('');
+}
+
+/* ---------------------------------------------------------------- launch */
+$('#launch').addEventListener('click', async () => {
+  const msg = $('#launch-msg');
+  msg.textContent = 'starting…';
+  const body = {
+    targets: $('#n-targets').value.split(/[\s,]+/).filter(Boolean),
+    authorized: $('#n-authorized').checked,
+    auth_ref: $('#n-ref').value, operator: $('#n-operator').value,
+    scope_file: $('#n-scope').value, profile: $('#n-profile').value,
+    ports: $('#n-ports').value, min_severity: $('#n-sev').value,
+    cred_attempts: +$('#n-creds-n').value,
+    checks: $('#n-checks').checked, nuclei: $('#n-nuclei').checked,
+    creds: $('#n-creds').checked, streams: $('#n-streams').checked,
+    login_discovery: $('#n-login').checked, screenshots: $('#n-shots').checked,
+    geoip: $('#n-geoip').checked, exploit: $('#n-exploit').checked,
+    allow_large: $('#n-large').checked, allow_public: $('#n-public').checked,
+  };
+  try {
+    const res = await api('/api/scans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'X-KAMSTRIKE-Token': $('#n-token').value.trim() },
+      body: JSON.stringify(body),
+    });
+    msg.textContent = `started ${res.id} (${res.hosts} hosts)`;
+    try { localStorage.setItem('kamstrike-token', $('#n-token').value.trim()); } catch (_) {}
+    state.scanId = res.id;
+    show('scans'); await loadScans(); await selectScan(res.id);
+  } catch (err) {
+    msg.innerHTML = `<span style="color:var(--critical)">${esc(err.message)}</span>`;
+  }
+});
+
+['#f-device', '#f-sev', '#f-vendor'].forEach((s) => $(s).addEventListener('input', renderDevices));
+['#f-finding', '#f-conf'].forEach((s) => $(s).addEventListener('input', renderFindings));
+['#f-ex', '#f-ex-sev', '#f-ex-vendor', '#f-ex-wild', '#f-ex-intrusive']
+  .forEach((s) => $(s).addEventListener('input', renderExploits));
+$('#refresh').addEventListener('click', (e) => { e.stopPropagation(); loadScans(); });
+
+(async () => {
+  try { $('#n-token').value = localStorage.getItem('kamstrike-token') || ''; } catch (_) {}
+  await loadMeta();
+  await loadScans();
+  setInterval(loadScans, 15000);
+})();
+</script>
+</body>
+</html>
