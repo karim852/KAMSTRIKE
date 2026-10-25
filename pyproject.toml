@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kamstrike"
 version = "0.1.0"
-description = "Authorized security assessment framework for IP cameras, NVRs and DVRs"
+description = "Camera, NVR and DVR exploitation framework"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -25,7 +25,12 @@ kamstrike = "kamstrike.cli:main"
 include = ["kamstrike*"]
 
 [tool.setuptools.package-data]
-kamstrike = ["data/*.yaml", "data/*.txt", "nuclei/templates/*.yaml"]
+kamstrike = [
+    "data/*.yaml", "data/*.txt",
+    "templates/library/*.yaml",
+    "recon/*.js",
+    "web/static/*",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

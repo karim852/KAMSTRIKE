@@ -6,7 +6,7 @@ from ..core.models import Confidence, Finding, Severity
 from .base import CheckContext, register
 
 #: nothing here changes device state; stack bugs that need execution to prove live in
-#: the nuclei template set, where their intrusiveness is declared in the KB.
+#: the template library, where their intrusiveness is declared in the KB.
 
 
 @register("stack_banner_review", "Embedded web stack version review")

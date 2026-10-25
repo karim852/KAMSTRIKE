@@ -31,8 +31,8 @@ from ..core.models import Severity
 from ..core.net import PORT_PROFILES, profile_ports
 from ..core.runmeta import prepare
 from ..core.targets import TargetError
-from ..nuclei import runner as nuclei_runner
 from ..report.writers import write_all
+from ..templates import loader as template_loader
 
 STATIC_DIR = Path(__file__).with_name("static")
 #: assets the dashboard loads; everything is served from this host, never a CDN
@@ -71,7 +71,7 @@ class ScanRegistry:
                 "finished_at": data.get("finished_at"),
                 "duration_sec": data.get("duration_sec"),
                 "run": data.get("run", {}),
-                "stats": {k: v for k, v in stats.items() if k != "nuclei"},
+                "stats": {k: v for k, v in stats.items() if k != "templates"},
             }
         with self._lock:
             for scan_id, run in self._runs.items():
@@ -181,11 +181,13 @@ def _options_from_payload(payload: dict[str, Any], outdir: Path) -> tuple[ScanOp
         host_concurrency=64,
         rate_delay=float(payload.get("rate_delay") or 0.0),
     )
-    nuclei_cfg = nuclei_runner.NucleiConfig(allow_intrusive=bool(payload.get("exploit")))
+    template_cfg = template_loader.TemplateConfig(
+        allow_intrusive=bool(payload.get("exploit"))
+    )
     options = ScanOptions(
         ports=ports,
         run_checks=payload.get("checks", True),
-        run_nuclei=payload.get("nuclei", True),
+        run_templates=payload.get("templates", True),
         run_creds=payload.get("creds", True),
         run_streams=payload.get("streams", True),
         run_login_discovery=payload.get("login_discovery", True),
@@ -194,7 +196,7 @@ def _options_from_payload(payload: dict[str, Any], outdir: Path) -> tuple[ScanOp
         allow_intrusive=bool(payload.get("exploit")),
         min_severity=Severity(str(payload.get("min_severity") or "info")),
         cred_attempts=int(payload.get("cred_attempts") or 8),
-        nuclei=nuclei_cfg,
+        templates=template_cfg,
         outdir=outdir,
     )
     return options, net
@@ -206,11 +208,11 @@ def _verification_label(entry: kb.KBEntry) -> str:
         return "advisory only - no safe remote test, verify from the console"
     if entry.intrusive:
         return "needs --exploit - verification changes device state"
-    if entry.check and entry.nuclei:
-        return "local check plus nuclei template"
+    if entry.check and entry.templates:
+        return "built-in check plus template"
     if entry.check:
-        return "local check, read-only"
-    return "nuclei template"
+        return "built-in check, read-only"
+    return "template"
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
@@ -348,7 +350,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     # -------------------------------------------------------------- reference
     def _meta(self) -> dict[str, Any]:
-        nuclei_cfg = nuclei_runner.NucleiConfig()
         from ..recon import screenshot
 
         shots_ok, shots_reason = screenshot.available()
@@ -356,10 +357,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "version": __version__,
             "profiles": {name: len(profile_ports(name)) for name in sorted(PORT_PROFILES)},
             "severities": [s.value for s in Severity],
-            "nuclei": {
-                "available": nuclei_runner.available(nuclei_cfg),
-                "roots": [str(p) for p in nuclei_runner.template_roots(nuclei_cfg)],
-                "bundled": len(list(kb.bundled_template_dir().glob("*.yaml"))),
+            "templates": {
+                "count": len(template_loader.load(template_loader.TemplateConfig())[0]),
+                "library": str(template_loader.library_dir()),
             },
             "screenshots": {"available": shots_ok, "reason": shots_reason},
             "counts": {
@@ -386,7 +386,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def _exploits(self) -> list[dict[str, Any]]:
         """The knowledge base as an exploit catalogue: what is tested, how, and how loudly."""
         checks_base.load_all()
-        bundled = {p.stem for p in kb.bundled_template_dir().glob("*.yaml")}
+        bundled = {t.id for t in template_loader.load(template_loader.TemplateConfig())[0]}
         out = []
         for e in kb.kb_entries():
             out.append(
@@ -402,7 +402,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     "check": e.check or "",
                     "check_description": checks_base.DESCRIPTIONS.get(e.check or "", ""),
                     "templates": [
-                        {"id": t, "bundled": t in bundled} for t in e.nuclei
+                        {"id": t, "bundled": t in bundled} for t in e.templates
                     ],
                     "intrusive": e.intrusive,
                     "advisory": e.advisory,
@@ -426,7 +426,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "vendors": list(e.vendors),
                 "stacks": list(e.stacks),
                 "check": e.check or "",
-                "nuclei": list(e.nuclei),
+                "templates": list(e.templates),
                 "intrusive": e.intrusive,
                 "advisory": e.advisory,
                 "wild": e.wild,

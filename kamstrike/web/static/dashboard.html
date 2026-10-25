@@ -129,6 +129,8 @@
 
   .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
   .filters input, .filters select { width: auto; min-width: 150px; }
+  /* the min-width above is for text fields; a checkbox must stay its own size */
+  .filters input[type="checkbox"] { min-width: 0; width: auto; }
   .empty { color: var(--faint); padding: 26px; text-align: center; font-size: 13px; }
   .scroll { max-height: 70vh; overflow: auto; }
   .links a { display: inline-block; margin: 2px 8px 2px 0; font-size: 12px; }
@@ -307,7 +309,7 @@
       <label>Stages</label>
       <div class="checks">
         <label class="check"><input type="checkbox" id="n-checks" checked> vendor checks</label>
-        <label class="check"><input type="checkbox" id="n-nuclei" checked> nuclei templates</label>
+        <label class="check"><input type="checkbox" id="n-templates" checked> templates</label>
         <label class="check"><input type="checkbox" id="n-creds" checked> default credentials</label>
         <label class="check"><input type="checkbox" id="n-streams" checked> media discovery</label>
         <label class="check"><input type="checkbox" id="n-login" checked> login surfaces</label>
@@ -379,8 +381,7 @@ async function loadMeta() {
   $('#meta').innerHTML =
     `v${esc(m.version)} · ${m.counts.vendors} vendors · ${m.counts.kb_entries} entries · ` +
     `${m.counts.cves} CVEs · ${m.counts.credentials} default creds<br>` +
-    `nuclei ${m.nuclei.available ? `ready · ${m.nuclei.bundled} bundled templates`
-      : '<span style="color:var(--high)">not installed</span>'} · ` +
+    `${m.templates.count} templates · ` +
     `screenshots ${m.screenshots.available ? 'ready' :
       '<span style="color:var(--high)">' + esc(m.screenshots.reason) + '</span>'}`;
   $('#n-profile').innerHTML = Object.entries(m.profiles)
@@ -771,7 +772,7 @@ function renderExploits() {
   rows = sortRows(rows, 'extable', (e, k) => k === 'severity' ? SEV_RANK[e.severity] : e[k], true);
   $('#extable tbody').innerHTML = rows.length ? rows.map((e, i) => `
     <tr data-i="${i}"><td>${pill(e.severity)}</td>
-    <td><div>${esc(e.title.slice(0, 58))}</div>
+    <td><div>${esc(e.title)}</div>
         <div class="mono" style="color:var(--faint)">${esc(e.id)}</div></td>
     <td>${esc(e.vendors.join(', '))}${e.stacks.length
       ? ` <span class="tag">${esc(e.stacks.join(','))}</span>` : ''}</td>
@@ -789,7 +790,7 @@ function renderExploits() {
 function openExploit(e) {
   const templates = e.templates.map((t) =>
     `<span class="tag ${t.bundled ? 'ok' : ''}">${esc(t.id)}${
-      t.bundled ? ' · bundled' : ' · from your template store'}</span>`).join('') || '—';
+      t.bundled ? '' : ' · missing'}</span>`).join('') || '—';
   $('#drawer').innerHTML = `
     <button class="btn" style="float:right" onclick="closeDrawer()">close</button>
     <h3>${pill(e.severity)} ${esc(e.title)}</h3>
@@ -810,7 +811,7 @@ function openExploit(e) {
     <h2>What it is</h2><div class="evidence">${esc(e.description)}</div>
     <h2>Remediation</h2><div class="evidence">${esc(e.remediation || '—')}</div>
     <h2>Run just this entry</h2>
-    <div class="cmd">kamstrike scan &lt;target&gt; --only ${esc(e.id)}${
+    <div class="cmd">kamstrike &lt;target&gt; --only ${esc(e.id)}${
       e.intrusive ? ' --exploit' : ''}</div>
     ${e.references.length ? `<h2>References</h2><div class="links">${
       e.references.map((r) => `<a href="${esc(r)}" target="_blank">${esc(r)}</a>`)
@@ -837,7 +838,7 @@ $('#launch').addEventListener('click', async () => {
     profile: $('#n-profile').value,
     ports: $('#n-ports').value, min_severity: $('#n-sev').value,
     cred_attempts: +$('#n-creds-n').value,
-    checks: $('#n-checks').checked, nuclei: $('#n-nuclei').checked,
+    checks: $('#n-checks').checked, templates: $('#n-templates').checked,
     creds: $('#n-creds').checked, streams: $('#n-streams').checked,
     login_discovery: $('#n-login').checked, screenshots: $('#n-shots').checked,
     geoip: $('#n-geoip').checked, exploit: $('#n-exploit').checked,

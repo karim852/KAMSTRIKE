@@ -22,7 +22,7 @@ def scan(mock_camera, tmp_path):
     def run(**overrides):
         options = ScanOptions(
             ports=[mock_camera.port],
-            run_nuclei=False,
+            run_templates=False,
             run_screenshots=False,
             outdir=tmp_path,
             cred_delay=0.0,
@@ -162,9 +162,42 @@ def test_unreachable_host_is_handled(tmp_path):
     """A dead target must produce a clean empty result, not an exception."""
     import asyncio
 
-    options = ScanOptions(ports=[9], run_nuclei=False, outdir=tmp_path)
+    options = ScanOptions(ports=[9], run_templates=False, outdir=tmp_path)
     meta, _ = prepare(["127.0.0.2"])
     engine = Engine(NetConfig(timeout=0.5, connect_timeout=0.3), options, meta)
     result = asyncio.run(engine.run(["127.0.0.2"]))
     assert result.devices and not result.alive
     assert result.stats["findings_total"] == 0
+
+
+def test_templates_run_in_process_and_corroborate_the_check(mock_camera, tmp_path):
+    """The template stage needs no external binary, and it must agree with the check."""
+    import asyncio
+
+    options = ScanOptions(
+        ports=[mock_camera.port], run_templates=True, run_screenshots=False,
+        outdir=tmp_path, cred_delay=0.0,
+    )
+    meta, _ = prepare(["127.0.0.1"], label="TPL")
+    engine = Engine(NetConfig(timeout=3.0, connect_timeout=1.0), options, meta)
+    result = asyncio.run(engine.run(["127.0.0.1"]))
+
+    stats = result.stats["templates"]
+    assert stats["templates_selected"] > 0
+    assert stats["matches"] >= 1
+
+    bypass = [f for f in result.findings if "CVE-2017-7921" in f.cve]
+    assert len(bypass) == 1, "the check and the template must be merged, not double-counted"
+    assert bypass[0].extra.get("corroborated_by"), "the template should corroborate the check"
+
+
+def test_templates_can_be_skipped(mock_camera, tmp_path):
+    import asyncio
+
+    options = ScanOptions(ports=[mock_camera.port], run_templates=False, outdir=tmp_path,
+                          cred_delay=0.0)
+    meta, _ = prepare(["127.0.0.1"])
+    result = asyncio.run(
+        Engine(NetConfig(timeout=3.0, connect_timeout=1.0), options, meta).run(["127.0.0.1"])
+    )
+    assert "templates" not in result.stats

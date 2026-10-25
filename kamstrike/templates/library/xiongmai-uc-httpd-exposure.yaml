@@ -19,7 +19,7 @@ info:
   metadata:
     verified: true
     vendor: xiongmai
-  tags: xiongmai,dvr,nvr,camera,buffer-overflow,tech,kamstrike
+  tags: xiongmai,dvr,nvr,camera,buffer-overflow,tech
 
 http:
   - method: GET

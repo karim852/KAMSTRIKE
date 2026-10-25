@@ -12,7 +12,7 @@ info:
   metadata:
     verified: true
     max-request: 10
-  tags: camera,exposure,media,unauth,kamstrike
+  tags: camera,exposure,media,unauth,generic
 
 http:
   - method: GET

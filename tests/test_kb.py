@@ -5,7 +5,7 @@ import yaml
 
 from kamstrike.checks import base as checks_base
 from kamstrike.core import kb
-from kamstrike.core.models import Severity
+from kamstrike.core.models import Device, Severity
 
 
 def test_vendor_db_loads():
@@ -42,7 +42,7 @@ def test_every_kb_entry_is_actionable():
     """An entry has to be testable or at least tell the operator what to do about it."""
     for entry in kb.kb_entries():
         assert entry.title and entry.description, entry.id
-        assert entry.check or entry.nuclei or entry.advisory, (
+        assert entry.check or entry.templates or entry.advisory, (
             f"{entry.id} has no check and no template; mark it `advisory: true` if that is "
             "deliberate so it is reported as a candidate rather than silently skipped"
         )
@@ -93,16 +93,17 @@ def test_credential_limit_respected():
     assert len(kb.cred_db().for_vendor("Dahua", limit=4)) == 4
 
 
-def test_nuclei_ids_resolve_to_bundled_or_public_templates():
-    bundled = {p.stem for p in kb.bundled_template_dir().glob("*.yaml")}
-    referenced = set(kb.nuclei_template_ids())
+def test_every_referenced_template_ships_with_the_tool():
+    """Nothing external has to be installed, so every reference must resolve locally."""
+    from kamstrike.templates import loader
+
+    available = {t.id for t in loader.load(loader.TemplateConfig())[0]}
+    referenced = set(kb.template_ids())
     assert referenced, "no templates referenced by the knowledge base"
-    # anything not bundled must be a real CVE id we expect from the public template store
-    for template_id in referenced - bundled:
-        assert template_id.startswith(("CVE-", "netwave-")), template_id
+    assert not (referenced - available), f"missing templates: {sorted(referenced - available)}"
 
 
-def test_bundled_templates_are_valid_nuclei_yaml():
+def test_bundled_templates_are_valid():
     for path in kb.bundled_template_dir().glob("*.yaml"):
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert data.get("id"), path.name
@@ -112,18 +113,29 @@ def test_bundled_templates_are_valid_nuclei_yaml():
         assert any(k in data for k in ("http", "tcp", "dns", "file")), path.name
 
 
-def test_intrusive_templates_carry_the_intrusive_tag():
-    """--exploit gating relies on the tag, so a mismatch would silently run a payload."""
-    from kamstrike.nuclei.runner import INTRUSIVE_TAG
+def test_intrusive_templates_belong_to_intrusive_entries():
+    """A template that changes device state must sit under an entry that says so, or the
+    knowledge base would understate what running it costs."""
+    from kamstrike.templates import loader
+    from kamstrike.templates.engine import INTRUSIVE_TAG
 
-    by_id = {}
-    for path in kb.bundled_template_dir().glob("*.yaml"):
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        by_id[data["id"]] = str((data.get("info") or {}).get("tags", ""))
-    for entry in kb.kb_entries():
-        for template_id in entry.nuclei:
-            if template_id in by_id and entry.intrusive:
-                assert INTRUSIVE_TAG in by_id[template_id], template_id
+    entry_by_template = {t: e for e in kb.kb_entries() for t in e.templates}
+    for template in loader.load(loader.TemplateConfig())[0]:
+        if INTRUSIVE_TAG not in template.tags:
+            continue
+        entry = entry_by_template.get(template.id)
+        assert entry is not None, f"{template.id} is intrusive but no entry claims it"
+        assert entry.intrusive, f"{template.id} is intrusive but {entry.id} is not marked so"
+
+
+def test_read_only_templates_run_without_the_exploit_flag():
+    """A detection template under an intrusive entry must still run by default."""
+    from kamstrike.core.models import Service
+    from kamstrike.templates import loader
+
+    device = Device(host="10.0.0.1", vendor="NUUO", services=[Service(port=80, name="http")])
+    chosen = {t.id for t in loader.select([device], loader.TemplateConfig())["10.0.0.1"]}
+    assert "CVE-2018-1150" in chosen
 
 
 def test_path_lists_load():

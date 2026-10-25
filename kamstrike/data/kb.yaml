@@ -2,7 +2,7 @@
 #
 # This file is the correlation layer: it maps a fingerprinted vendor onto the
 # weaknesses that actually matter for that vendor, the local verification check that
-# proves them, and the nuclei templates that cover them.
+# proves them, and the templates that cover them.
 #
 # Fields:
 #   id             stable slug used on the CLI (--only / --skip) and in reports
@@ -10,8 +10,8 @@
 #   vendors        vendors this applies to; ["*"] means any device
 #   stacks         embedded web stack names (GoAhead, Boa, uc-httpd ...)
 #   severity       info | low | medium | high | critical
-#   check          id of a kamstrike.checks module function, or null for nuclei-only
-#   nuclei         template ids to select from the nuclei template store
+#   check          id of a kamstrike.checks module function, or null for template-only
+#   templates      ids of the YAML templates that cover this entry
 #   intrusive      true when verification changes device state; needs --exploit
 #   advisory       true when the weakness has no safe remote test at all; the entry is
 #                  reported as an unverified candidate whenever the vendor matches, so the
@@ -33,7 +33,7 @@ entries:
       5.4.41 across a very wide range of OEM rebadges (HiWatch, HiLook, Honeywell, many more).
     affected: "firmware 5.2.0 - 5.4.41 (and OEM equivalents)"
     check: hikvision_auth_bypass
-    nuclei: [CVE-2017-7921]
+    templates: [CVE-2017-7921]
     intrusive: false
     wild: true
     remediation: Upgrade to 5.4.5 or later and rotate every account; the old passwords are recoverable.
@@ -53,7 +53,7 @@ entries:
       70 product families are affected and the flaw is routinely weaponised by botnets.
     affected: "numerous families, firmware before the September 2021 fix"
     check: hikvision_cve_2021_36260
-    nuclei: [CVE-2021-36260]
+    templates: [CVE-2021-36260]
     intrusive: true
     wild: true
     remediation: Apply the vendor firmware update; the endpoint cannot be safely left exposed.
@@ -68,7 +68,7 @@ entries:
     title: Hikvision ISAPI device information reachable
     description: The ISAPI tree is exposed; it reveals model, firmware build and serial number.
     check: hikvision_isapi_info
-    nuclei: []
+    templates: []
     intrusive: false
     wild: false
     remediation: Restrict management interfaces to an administrative VLAN.
@@ -87,7 +87,7 @@ entries:
       retrieving the administrator password.
     affected: "firmware before the 2017 security releases, plus Amcrest/Lorex/Intelbras rebadges"
     check: dahua_config_disclosure
-    nuclei: [CVE-2017-7925]
+    templates: [CVE-2017-7925]
     intrusive: false
     wild: true
     remediation: Upgrade firmware and rotate credentials on every rebadged unit too.
@@ -106,7 +106,7 @@ entries:
       full device control over both the HTTP RPC interface and the binary protocol on 37777.
     affected: "many IPC/VTO/NVR families with firmware before the September 2021 baseline"
     check: dahua_auth_bypass
-    nuclei: [CVE-2021-33044]
+    templates: [CVE-2021-33044]
     intrusive: false
     wild: true
     remediation: Apply the vendor firmware baseline; no configuration change mitigates it.
@@ -123,7 +123,7 @@ entries:
       The ONVIF service accepts a replayed WS-UsernameToken, so an attacker who can observe one
       unencrypted ONVIF exchange can reuse it to authenticate as that account.
     check: null
-    nuclei: []
+    templates: []
     intrusive: false
     advisory: true
     wild: false
@@ -143,7 +143,7 @@ entries:
       three give unauthenticated root on roughly 390 camera models.
     affected: "~390 models, firmware before the mid-2018 patches"
     check: axis_srv_bypass
-    nuclei: [CVE-2018-10661]
+    templates: [CVE-2018-10661]
     intrusive: false
     wild: false
     remediation: Upgrade to patched firmware; the bypass is not mitigable by ACLs on the web root.
@@ -161,7 +161,7 @@ entries:
       Insufficient path sanitisation in the web interface lets an unauthenticated request walk
       out of the web root and read arbitrary files, including the credential store.
     check: generic_path_traversal
-    nuclei: [CVE-2018-14786]
+    templates: [CVE-2018-14786]
     intrusive: false
     wild: false
     remediation: Upgrade firmware to the patched release.
@@ -181,7 +181,7 @@ entries:
       so no patch exists.
     affected: "end-of-life GV video servers / DVRs - no fix available"
     check: null
-    nuclei: [CVE-2024-11120]
+    templates: [CVE-2024-11120]
     intrusive: true
     wild: true
     remediation: These models are unpatchable. Replace them, or fully isolate them from routable networks.
@@ -195,7 +195,7 @@ entries:
     title: GeoVision unauthenticated information disclosure
     description: An unauthenticated endpoint returns system information useful for follow-on attacks.
     check: null
-    nuclei: [CVE-2023-3357]
+    templates: [CVE-2023-3357]
     intrusive: false
     wild: false
     remediation: Upgrade where firmware exists; otherwise isolate.
@@ -215,7 +215,7 @@ entries:
       (TBK, Novo, CeNova, QSee, Pulnix, XVR 5-in-1, Night OWL and others), which is why this
       one bug keeps showing up on internet-wide scans years after disclosure.
     check: dvr_cookie_cred_dump
-    nuclei: [CVE-2018-9995]
+    templates: [CVE-2018-9995]
     intrusive: false
     wild: true
     remediation: Replace the recorder or place it behind a VPN; most affected brands never shipped a fix.
@@ -232,7 +232,7 @@ entries:
       A request parameter on the device status endpoint reaches a shell. Mirai variants adopted
       it within weeks of disclosure and it remains one of the most-exploited DVR bugs.
     check: null
-    nuclei: [CVE-2024-3721]
+    templates: [CVE-2024-3721]
     intrusive: true
     wild: true
     remediation: No vendor fix for the affected models; remove them from routable networks.
@@ -248,7 +248,7 @@ entries:
       The web interface resolves encoded traversal sequences, letting an unauthenticated request
       read any file the web server can reach, which on these recorders means the whole filesystem.
     check: generic_path_traversal
-    nuclei: [CVE-2019-20085]
+    templates: [CVE-2019-20085]
     intrusive: false
     wild: true
     remediation: Upgrade firmware; restrict management access meanwhile.
@@ -267,7 +267,7 @@ entries:
       the affected models are end of life.
     affected: "AVM1203 and related end-of-life models - no fix available"
     check: null
-    nuclei: [CVE-2024-7029]
+    templates: [CVE-2024-7029]
     intrusive: true
     wild: true
     remediation: Unpatchable. Decommission or fully isolate.
@@ -287,7 +287,7 @@ entries:
       username and password in cleartext. The same firmware also leaves the RTSP server
       unauthenticated. Shipped under more than a thousand white-label brands.
     check: wificam_cred_leak
-    nuclei: [CVE-2017-5674]
+    templates: [CVE-2017-5674]
     intrusive: false
     wild: true
     remediation: These devices are not maintainable. Replace them.
@@ -306,7 +306,7 @@ entries:
       the dynamic loader preload variable and execute attacker-supplied code. Affects GoAhead
       2.5 through 3.6.5, which is the web server inside a large share of budget camera firmware.
     check: null
-    nuclei: [CVE-2017-17562]
+    templates: [CVE-2017-17562]
     intrusive: true
     wild: true
     remediation: Upgrade GoAhead to 3.6.5+ (usually means new firmware, often unavailable).
@@ -325,7 +325,7 @@ entries:
       which is exploitable for code execution. uc-httpd 1.0.0 is a reliable marker for the
       Xiongmai OEM platform behind a very large number of white-label recorders.
     check: uc_httpd_detect
-    nuclei: []
+    templates: [xiongmai-uc-httpd-exposure]
     intrusive: false
     wild: true
     remediation: Replace the device; Xiongmai OEM units generally receive no security firmware.
@@ -342,7 +342,7 @@ entries:
       telnet service, and a cloud P2P identifier derived from the MAC address that allows
       locating the device from the internet regardless of firewalling.
     check: xiongmai_dvrip_probe
-    nuclei: []
+    templates: []
     intrusive: false
     wild: true
     remediation: Replace the device. Disabling P2P in the UI does not reliably disable the service.
@@ -360,7 +360,7 @@ entries:
       password, which also unlocks the RTSP stream and any reused credentials.
     affected: "DCS-2530L, DCS-2670L and related, before the 2020 firmware"
     check: dlink_dcs_getuser
-    nuclei: [CVE-2020-25078]
+    templates: [CVE-2020-25078]
     intrusive: false
     wild: true
     remediation: Upgrade firmware and rotate the password.
@@ -374,7 +374,7 @@ entries:
     title: D-Link DCS stack buffer overflow in the alphapd web server
     description: An authenticated request overflows a stack buffer in alphapd, allowing code execution.
     check: null
-    nuclei: []
+    templates: []
     intrusive: false
     advisory: true
     wild: false
@@ -392,7 +392,7 @@ entries:
       A debug script left in the shipped firmware is reachable without authentication and lets
       an attacker enumerate and reset accounts, including the administrator.
     check: null
-    nuclei: [CVE-2018-1150]
+    templates: [CVE-2018-1150]
     intrusive: true
     wild: false
     remediation: Upgrade firmware; the model line is largely end of life.
@@ -408,7 +408,7 @@ entries:
       An oversized session cookie overflows a stack buffer in the CGI handler, giving
       unauthenticated root and access to every camera the recorder manages.
     check: null
-    nuclei: []
+    templates: []
     intrusive: false
     advisory: true
     wild: false
@@ -426,7 +426,7 @@ entries:
       A diagnostic endpoint dumps process memory, which reliably contains the administrator
       credentials. Present on Netwave-based Foscam OEM units and many rebadges.
     check: netwave_info_leak
-    nuclei: [netwave-ip-camera-info-disclosure]
+    templates: [netwave-ip-camera-info-disclosure]
     intrusive: false
     wild: true
     remediation: Replace the device or firewall it off entirely.
@@ -444,7 +444,7 @@ entries:
       outcome an attacker actually wants from a camera, and it is frequently reachable even when
       the login page itself looks properly protected.
     check: unauth_snapshot
-    nuclei: []
+    templates: [camera-unauth-snapshot]
     intrusive: false
     wild: true
     remediation: Require authentication on all media endpoints; do not rely on the login page alone.
@@ -460,7 +460,7 @@ entries:
       common root cause of camera compromise and gives the attacker everything the console gives
       an administrator - live video, stored recordings, network configuration and a foothold.
     check: default_credentials
-    nuclei: []
+    templates: []
     intrusive: false
     wild: true
     remediation: Change every account password and disable unused accounts.
@@ -475,7 +475,7 @@ entries:
       The RTSP server described a media stream to an unauthenticated client, so the live feed can
       be pulled by anyone who can reach port 554.
     check: rtsp_probe
-    nuclei: []
+    templates: []
     intrusive: false
     wild: true
     remediation: Enable RTSP authentication and restrict the port to the recording server.
@@ -490,7 +490,7 @@ entries:
       The ONVIF endpoint returned manufacturer, model, firmware and serial to an unauthenticated
       SOAP request, which hands an attacker exact firmware targeting information.
     check: onvif_probe
-    nuclei: []
+    templates: [onvif-anonymous-device-info]
     intrusive: false
     wild: false
     remediation: Require authentication on ONVIF, or disable it if no client needs it.
@@ -505,7 +505,7 @@ entries:
       Telnet is open. On this class of device it is normally an undocumented debug service with a
       hardcoded or default root password, and it carries credentials in cleartext.
     check: telnet_exposed
-    nuclei: []
+    templates: []
     intrusive: false
     wild: true
     remediation: Disable telnet. If the firmware offers no way to, replace the device.
@@ -520,7 +520,7 @@ entries:
       A configuration or administrative endpoint returned content to an anonymous request, so the
       device is effectively unprotected.
     check: unauth_admin
-    nuclei: []
+    templates: []
     intrusive: false
     wild: true
     remediation: Enable authentication and verify it applies to every endpoint, not just the UI.

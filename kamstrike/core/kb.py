@@ -120,7 +120,7 @@ class KBEntry:
     stacks: tuple[str, ...] = ()
     device_types: tuple[str, ...] = ()
     check: str | None = None
-    nuclei: tuple[str, ...] = ()
+    templates: tuple[str, ...] = ()
     intrusive: bool = False
     wild: bool = False
     #: no safe remote verification exists; only ever reported as a candidate
@@ -163,7 +163,7 @@ def kb_entries() -> tuple[KBEntry, ...]:
                 stacks=tuple(e.get("stacks") or ()),
                 device_types=tuple(e.get("device_types") or ()),
                 check=e.get("check") or None,
-                nuclei=tuple(e.get("nuclei") or ()),
+                templates=tuple(e.get("templates") or ()),
                 intrusive=bool(e.get("intrusive", False)),
                 advisory=bool(e.get("advisory", False)),
                 wild=bool(e.get("wild", False)),
@@ -195,12 +195,13 @@ def entries_by_check() -> dict[str, list[KBEntry]]:
     return out
 
 
-def nuclei_template_ids(vendor: str = "", stacks: list[str] | None = None) -> list[str]:
+def template_ids(vendor: str = "", stacks: list[str] | None = None) -> list[str]:
+    """Template ids worth running against a device with this fingerprint."""
     seen: list[str] = []
     for e in kb_entries():
         if vendor and not e.applies_to(vendor, stacks):
             continue
-        for t in e.nuclei:
+        for t in e.templates:
             if t not in seen:
                 seen.append(t)
     return seen
@@ -255,5 +256,5 @@ def snapshot_paths() -> list[str]:
 
 
 def bundled_template_dir() -> Path:
-    """Directory holding the nuclei templates that ship with KAMSTRIKE."""
-    return Path(str(resources.files("kamstrike.nuclei").joinpath("templates")))
+    """Directory holding the templates that ship with KAMSTRIKE."""
+    return Path(str(resources.files("kamstrike.templates").joinpath("library")))

@@ -34,7 +34,7 @@ def banner(console: Console, version: str) -> None:
     creds = kb.cred_db()
     console.print(Text(BANNER, style="bold green"))
     console.print(
-        f"  camera / NVR / DVR assessment framework  [bold]v{version}[/bold]\n"
+        f"  camera · NVR · DVR exploitation framework  [bold]v{version}[/bold]\n"
         f"  [dim]{len(kb.vendor_db().vendors)} vendors · {len(kb.kb_entries())} exploits · "
         f"{len({c for e in kb.kb_entries() for c in e.cves})} CVEs · "
         f"{len(creds.global_creds) + sum(len(v) for v in creds.by_vendor.values())} "
@@ -129,9 +129,19 @@ def credentials_table(console: Console, result: ScanResult) -> None:
 
 
 def streams_list(console: Console, result: ScanResult) -> None:
-    urls = [(d.host, u) for d in result.devices for u in d.rtsp_streams]
-    if not urls:
+    """Media endpoints, with proven ones separated from vendor-pattern leads."""
+    streams = [(d.host, s) for d in result.devices for s in d.streams]
+    if not streams:
         return
-    console.print("\n[bold]Reachable streams[/bold]")
-    for host, url in urls:
-        console.print(f"  [dim]{host}[/dim]  {url}")
+    verified = [(h, s) for h, s in streams if s.verified]
+    leads = [(h, s) for h, s in streams if not s.verified]
+    if verified:
+        console.print("\n[bold]Media endpoints reachable[/bold]")
+        for host, stream in verified:
+            console.print(f"  [dim]{host}[/dim]  {stream.url}  [dim]{stream.protocol}[/dim]")
+    if leads:
+        console.print("\n[bold]Media leads[/bold] [dim](unverified, try with credentials)[/dim]")
+        for host, stream in leads[:12]:
+            console.print(f"  [dim]{host}[/dim]  {stream.url}")
+        if len(leads) > 12:
+            console.print(f"  [dim]... and {len(leads) - 12} more[/dim]")

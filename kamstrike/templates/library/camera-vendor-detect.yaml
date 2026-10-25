@@ -10,7 +10,7 @@ info:
   metadata:
     verified: true
     max-request: 1
-  tags: camera,nvr,dvr,tech,detect,kamstrike
+  tags: camera,nvr,dvr,tech,detect,generic
 
 http:
   - method: GET

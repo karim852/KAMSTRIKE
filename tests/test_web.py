@@ -71,7 +71,7 @@ def test_meta_reports_capabilities(dashboard):
     assert meta["counts"]["vendors"] > 20
     assert meta["counts"]["kb_entries"] > 20
     assert set(meta["profiles"]) == {"quick", "standard", "full", "wide"}
-    assert "available" in meta["nuclei"]
+    assert meta["templates"]["count"] >= 20
 
 
 def test_reference_endpoints(dashboard):
@@ -150,7 +150,7 @@ def test_scan_runs_through_the_api(dashboard, mock_camera):
     base, token = dashboard
     status, body = post(base, "/api/scans", {
         "targets": ["127.0.0.1"], "label": "WEB-TEST",
-        "ports": str(mock_camera.port), "nuclei": False, "screenshots": False,
+        "ports": str(mock_camera.port), "templates": False, "screenshots": False,
         "login_discovery": False, "streams": False,
     }, token)
     assert status == 202
@@ -196,8 +196,8 @@ def test_exploit_catalogue(dashboard):
     hik = by_id["hikvision-auth-bypass"]
     assert hik["check"] == "hikvision_auth_bypass"
     assert hik["check_description"]
-    assert any(t["bundled"] for t in hik["templates"])
-    assert hik["verification"] == "local check plus nuclei template"
+    assert all(t["bundled"] for t in hik["templates"])
+    assert hik["verification"] == "built-in check plus template"
 
     rce = by_id["hikvision-webdav-rce"]
     assert rce["intrusive"] is True

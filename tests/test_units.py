@@ -15,9 +15,10 @@ from kamstrike.core.models import (
     StreamEndpoint,
 )
 from kamstrike.core.net import PORT_PROFILES, profile_ports
-from kamstrike.nuclei import runner
 from kamstrike.recon import osint
 from kamstrike.recon.fingerprint import Evidence
+from kamstrike.templates import engine as tengine
+from kamstrike.templates import loader as tloader
 
 
 # ------------------------------------------------------------------ profiles
@@ -128,72 +129,69 @@ def test_scan_result_serialises():
     assert payload["devices"][0]["max_severity"] == "medium"
 
 
-# -------------------------------------------------------------------- nuclei
-def test_nuclei_record_is_converted_and_correlated():
-    record = {
-        "template-id": "CVE-2017-7921",
-        "info": {"name": "Hikvision auth bypass", "severity": "critical",
-                 "classification": {"cve-id": ["cve-2017-7921"]}, "tags": ["cve", "hikvision"]},
-        "host": "10.0.0.5:80",
-        "ip": "10.0.0.5",
-        "matched-at": "http://10.0.0.5:80/Security/users?auth=x",
-        "extracted-results": ["admin"],
-        "matcher-name": "users",
-    }
-    finding = runner.finding_from_record(record)
-    assert finding.host == "10.0.0.5"
-    assert finding.port == 80
-    assert finding.cve == ["CVE-2017-7921"]           # normalised to upper case
-    assert finding.severity is Severity.CRITICAL
-    assert finding.confidence is Confidence.CONFIRMED
-    assert finding.extra["kb_entry"] == "hikvision-auth-bypass"
-    assert finding.remediation                        # inherited from the knowledge base
+# ----------------------------------------------------------------- templates
+def test_template_library_loads_cleanly():
+    templates, errors = tloader.load(tloader.TemplateConfig())
+    assert not errors, errors
+    assert len(templates) >= 20
+    ids = [t.id for t in templates]
+    assert len(ids) == len(set(ids)), "duplicate template ids"
 
 
-def test_nuclei_output_parsing_skips_junk(tmp_path):
-    path = tmp_path / "out.jsonl"
-    path.write_text(
-        "not json\n"
-        '{"template-id":"x","info":{"severity":"low"},"ip":"10.0.0.9","host":"10.0.0.9:80"}\n'
-        "\n"
-    )
-    findings = runner.parse_output(path)
-    assert len(findings) == 1 and findings[0].host == "10.0.0.9"
+def test_every_template_is_well_formed():
+    for template in tloader.load(tloader.TemplateConfig())[0]:
+        assert template.name and template.requests, template.id
+        for request in template.requests:
+            assert request.matchers, f"{template.id}: a template with no matchers never fires"
+            assert request.paths or request.raw, template.id
 
 
-def test_nuclei_selection_is_vendor_scoped():
+def test_template_selection_is_vendor_scoped():
     hik = Device(host="10.0.0.1", vendor="Hikvision", services=[Service(port=80, name="http")])
-    ids, tags = runner.select_templates([hik], runner.NucleiConfig())
-    assert "CVE-2017-7921" in ids
-    assert "CVE-2017-7925" not in ids                 # the Dahua template must not be selected
-    assert "hikvision" in tags
+    chosen = {t.id for t in tloader.select([hik], tloader.TemplateConfig())["10.0.0.1"]}
+    assert "CVE-2017-7921" in chosen
+    assert "CVE-2017-7925" not in chosen          # the Dahua template must not be selected
 
 
-def test_nuclei_selection_excludes_intrusive_unless_allowed():
+def test_generic_templates_run_against_anything():
+    unknown = Device(host="10.0.0.9", services=[Service(port=80, name="http")])
+    chosen = {t.id for t in tloader.select([unknown], tloader.TemplateConfig())["10.0.0.9"]}
+    assert "camera-unauth-snapshot" in chosen
+    assert "CVE-2017-7921" not in chosen          # vendor-specific ones must not
+
+
+def test_intrusive_templates_need_the_flag():
     hik = Device(host="10.0.0.1", vendor="Hikvision", services=[Service(port=80, name="http")])
-    safe, _ = runner.select_templates([hik], runner.NucleiConfig(allow_intrusive=False))
-    loud, _ = runner.select_templates([hik], runner.NucleiConfig(allow_intrusive=True))
+    safe = {t.id for t in tloader.select([hik], tloader.TemplateConfig())["10.0.0.1"]}
+    loud = {t.id for t in
+            tloader.select([hik], tloader.TemplateConfig(allow_intrusive=True))["10.0.0.1"]}
     assert "CVE-2021-36260" not in safe
     assert "CVE-2021-36260" in loud
 
 
-def test_nuclei_command_excludes_intrusive_tags(tmp_path):
-    cmd = runner.build_command(
-        runner.NucleiConfig(), tmp_path / "t.txt", tmp_path / "o.jsonl", ["CVE-2017-7921"], ["iot"]
-    )
-    assert "-exclude-tags" in cmd
-    assert runner.INTRUSIVE_TAG in cmd[cmd.index("-exclude-tags") + 1]
-    assert "-no-interactsh" in cmd
-    assert "-template-id" in cmd
-
-
-def test_nuclei_target_urls_cover_every_web_port():
+def test_template_endpoints_cover_every_web_port():
     device = Device(host="10.0.0.1", services=[
         Service(port=80, name="http"), Service(port=443, name="https", tls=True),
         Service(port=554, name="rtsp"),
     ])
-    urls = runner.target_urls([device])
-    assert urls == ["http://10.0.0.1:80", "https://10.0.0.1:443"]
+    assert tloader.endpoints(device) == ["http://10.0.0.1:80", "https://10.0.0.1:443"]
+
+
+def test_match_is_converted_and_correlated():
+    template = next(t for t in tloader.load(tloader.TemplateConfig())[0]
+                    if t.id == "CVE-2017-7921")
+    device = Device(host="10.0.0.5", vendor="Hikvision")
+    match = tengine.Match(template=template, url="http://10.0.0.5:80/Security/users",
+                          matched_at="http://10.0.0.5:80/Security/users",
+                          extracted=["admin"], matcher_name="accounts", status=200)
+    finding = tloader.finding_from_match(device, match)
+    assert finding.host == "10.0.0.5" and finding.port == 80
+    assert finding.cve == ["CVE-2017-7921"]
+    assert finding.severity is Severity.CRITICAL
+    assert finding.confidence is Confidence.CONFIRMED
+    assert finding.extra["kb_entry"] == "hikvision-auth-bypass"
+    assert finding.remediation                    # inherited from the knowledge base
+    assert "admin" in finding.evidence
 
 
 # --------------------------------------------------------------------- osint
@@ -229,3 +227,104 @@ def test_ip_intel_tolerates_missing_fields():
 @pytest.mark.asyncio
 async def test_ip_intel_skips_private_addresses():
     assert await osint.ip_intel("192.168.1.5", probe=None) is None
+
+
+# ---------------------------------------------------- template engine mechanics
+class _Resp:
+    """Minimal response stand-in for matcher tests."""
+
+    def __init__(self, status=200, headers=None, body="", content=None):
+        self.status_code = status
+        self.headers = headers or {}
+        self.text = body
+        self.content = content if content is not None else body.encode()
+
+
+def _parts(resp):
+    return tengine._parts(resp)
+
+
+def test_word_matcher_conditions():
+    resp = _Resp(body="alpha beta gamma")
+    m_and = tengine.Matcher(kind="word", words=("alpha", "beta"), condition="and")
+    m_or = tengine.Matcher(kind="word", words=("alpha", "zulu"), condition="or")
+    m_miss = tengine.Matcher(kind="word", words=("alpha", "zulu"), condition="and")
+    assert m_and.evaluate(resp, _parts(resp))
+    assert m_or.evaluate(resp, _parts(resp))
+    assert not m_miss.evaluate(resp, _parts(resp))
+
+
+def test_negative_matcher_inverts():
+    resp = _Resp(body="<html>404 not found</html>")
+    m = tengine.Matcher(kind="word", words=("404",), negative=True)
+    assert not m.evaluate(resp, _parts(resp))
+
+
+def test_header_part_is_searched_separately():
+    resp = _Resp(headers={"Server": "uc-httpd 1.0.0"}, body="nothing here")
+    header = tengine.Matcher(kind="word", part="header", words=("uc-httpd",))
+    body = tengine.Matcher(kind="word", part="body", words=("uc-httpd",))
+    assert header.evaluate(resp, _parts(resp))
+    assert not body.evaluate(resp, _parts(resp))
+
+
+def test_status_and_binary_matchers():
+    jpeg = _Resp(content=b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+    assert tengine.Matcher(kind="status", status=(200,)).evaluate(jpeg, _parts(jpeg))
+    assert tengine.Matcher(kind="binary", binaries=(b"\xff\xd8\xff",)).evaluate(jpeg, _parts(jpeg))
+
+
+def test_dsl_matcher_subset():
+    resp = _Resp(body="x" * 2048)
+    assert tengine.Matcher(kind="dsl", dsl=("len(body) > 1024",)).evaluate(resp, _parts(resp))
+    assert not tengine.Matcher(kind="dsl", dsl=("len(body) < 1024",)).evaluate(resp, _parts(resp))
+    assert tengine.Matcher(kind="dsl", dsl=("status_code == 200",)).evaluate(resp, _parts(resp))
+
+
+def test_dsl_refuses_anything_outside_the_subset():
+    """Templates are data; they never get to run arbitrary expressions."""
+    resp = _Resp(body="x")
+    danger = tengine.Matcher(kind="dsl", dsl=("__import__('os').system('id')",))
+    assert not danger.evaluate(resp, _parts(resp))
+
+
+def test_regex_extractor_pulls_groups():
+    resp = _Resp(body="<userName>admin</userName><userName>guest</userName>")
+    ex = tengine.Extractor(kind="regex", group=1, regexes=(r"<userName>([^<]+)</userName>",))
+    assert ex.extract(resp, _parts(resp)) == ["admin", "guest"]
+
+
+def test_kval_extractor_reads_headers():
+    resp = _Resp(headers={"server": "App-webs/"})
+    ex = tengine.Extractor(kind="kval", kval=("server",))
+    assert ex.extract(resp, _parts(resp)) == ["server: App-webs/"]
+
+
+def test_placeholders_are_rendered():
+    ctx = tengine._context("http://10.0.0.5:8080")
+    assert ctx["Hostname"] == "10.0.0.5:8080"
+    assert ctx["Host"] == "10.0.0.5" and ctx["Port"] == "8080"
+    assert tengine.render("{{BaseURL}}/x", ctx) == "http://10.0.0.5:8080/x"
+    assert ctx["randstr"].startswith("ks")
+
+
+def test_raw_request_is_parsed():
+    ctx = tengine._context("http://10.0.0.5:80")
+    method, path, headers, body = tengine._parse_raw(
+        "POST /RPC2_Login HTTP/1.1\nHost: {{Hostname}}\nContent-Type: application/json\n\n{\"a\":1}",
+        ctx,
+    )
+    assert method == "POST" and path == "/RPC2_Login"
+    assert headers["Content-Type"] == "application/json"
+    assert "Host" not in headers           # httpx sets it from the URL
+    assert body == '{"a":1}'
+
+
+def test_parse_rejects_a_template_with_no_requests():
+    with pytest.raises(tengine.TemplateError):
+        tengine.parse({"id": "x", "info": {"name": "x", "severity": "info"}})
+
+
+def test_parse_rejects_a_template_with_no_id():
+    with pytest.raises(tengine.TemplateError):
+        tengine.parse({"info": {"name": "x"}})

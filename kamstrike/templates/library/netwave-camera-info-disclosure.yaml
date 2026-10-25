@@ -13,7 +13,7 @@ info:
   metadata:
     verified: true
     vendor: netwave
-  tags: camera,netwave,exposure,info-leak,kamstrike
+  tags: camera,netwave,exposure,info-leak
 
 http:
   - method: GET

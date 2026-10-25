@@ -1,11 +1,11 @@
 """The scan pipeline.
 
     targets -> authorization gate -> port scan -> fingerprint -> correlate
-            -> local checks -> nuclei -> report
+            -> local checks -> templates -> report
 
 Correlation is the step that makes this more than a port scanner: the fingerprint decides
-which knowledge-base entries are plausible, and only those entries' checks and nuclei
-templates get run. A Hikvision camera is never tested with Dahua payloads.
+which knowledge-base entries are plausible, and only those entries' checks and templates
+get run. A Hikvision camera is never tested with Dahua payloads.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..checks import base as checks_base
-from ..nuclei import runner as nuclei_runner
+from ..templates import loader as template_loader
 from . import kb
 from .models import Confidence, Device, Finding, ScanResult, Severity
 from .net import CAMERA_PORTS, QUICK_PORTS, HttpProbe, NetConfig, build_client
@@ -33,7 +33,7 @@ class ScanOptions:
     ports: list[int] = field(default_factory=lambda: list(QUICK_PORTS))
     deep_fingerprint: bool = True
     run_checks: bool = True
-    run_nuclei: bool = True
+    run_templates: bool = True
     run_creds: bool = True
     run_rtsp: bool = True
     run_onvif: bool = True
@@ -50,7 +50,9 @@ class ScanOptions:
     run_geoip: bool = False
     geoip_provider: str = ""
     screenshot_timeout: float = 12.0
-    nuclei: nuclei_runner.NucleiConfig = field(default_factory=nuclei_runner.NucleiConfig)
+    templates: template_loader.TemplateConfig = field(
+        default_factory=template_loader.TemplateConfig
+    )
     outdir: Path = field(default_factory=lambda: Path("kamstrike-out"))
 
     @classmethod
@@ -96,8 +98,9 @@ class Engine:
 
                 await self._enrich(alive, probe, result)
 
-            if self.options.run_nuclei:
-                await self._run_nuclei(alive, result)
+            if self.options.run_templates:
+                async with build_client(self.cfg) as client:
+                    await self._run_templates(alive, HttpProbe(client, self.cfg), result)
 
         self._finalise(result)
         return result
@@ -320,33 +323,31 @@ class Engine:
         for finding in findings or []:
             device.add_finding(finding)
 
-    async def _run_nuclei(self, devices: list[Device], result: ScanResult) -> None:
-        cfg = self.options.nuclei
+    async def _run_templates(
+        self, devices: list[Device], probe: HttpProbe, result: ScanResult
+    ) -> None:
+        cfg = self.options.templates
         cfg.allow_intrusive = self.options.allow_intrusive
-        if not nuclei_runner.available(cfg):
-            result.stats["nuclei"] = "binary not found - skipped"
-            self.progress("nuclei-skipped", {"reason": "binary not found"})
+        plan = template_loader.select(devices, cfg)
+        selected = sum(len(v) for v in plan.values())
+        if not selected:
+            result.stats["templates"] = {"templates_selected": 0, "matches": 0}
             return
-        ids, tags = nuclei_runner.select_templates(devices, cfg)
-        self.progress("nuclei-start", {"templates": len(ids), "tags": len(tags),
-                                       "targets": len(nuclei_runner.target_urls(devices))})
-        findings, log = await nuclei_runner.run(
-            devices, cfg, workdir=self.options.outdir / "nuclei"
+        self.progress(
+            "templates-start",
+            {"templates": selected,
+             "targets": sum(len(template_loader.endpoints(d)) for d in devices)},
         )
+        findings, stats = await template_loader.run(devices, probe, cfg)
         by_host = {d.host: d for d in devices}
         added = 0
         for finding in findings:
             device = by_host.get(finding.host)
-            if device is None:
-                continue
-            if device.add_finding(finding):
+            if device is not None and device.add_finding(finding):
                 added += 1
-        result.stats["nuclei"] = {
-            "templates_selected": len(ids),
-            "findings": added,
-            "log_tail": log.strip()[-1200:],
-        }
-        self.progress("nuclei-done", {"findings": added})
+        stats["matches"] = added
+        result.stats["templates"] = stats
+        self.progress("templates-done", {"findings": added})
 
     def _finalise(self, result: ScanResult) -> None:
         from ..recon.fingerprint import refine_device_type
@@ -391,7 +392,7 @@ class Engine:
 def _merge_duplicates(findings: list[Finding]) -> list[Finding]:
     """Collapse findings that describe the same CVE on the same endpoint.
 
-    A local check and a nuclei template often cover the same weakness. Reporting it twice
+    A local check and a template often cover the same weakness. Reporting it twice
     makes the device look worse than it is, so the richer finding wins and the other is
     recorded as corroboration - which is itself useful, since two independent confirmations
     is a stronger claim than one.
@@ -399,17 +400,23 @@ def _merge_duplicates(findings: list[Finding]) -> list[Finding]:
     merged: dict[tuple, Finding] = {}
     passthrough: list[Finding] = []
     for finding in findings:
-        if not finding.cve:
+        if finding.cve:
+            key = (finding.host, finding.port, tuple(sorted(c.upper() for c in finding.cve)))
+        elif finding.source != "template":
+            # same issue on the same endpoint, whether a check or a template found it
+            key = (finding.host, finding.port, finding.source)
+        else:
             passthrough.append(finding)
             continue
-        key = (finding.host, finding.port, tuple(sorted(c.upper() for c in finding.cve)))
         existing = merged.get(key)
         if existing is None:
             merged[key] = finding
             continue
         keep, drop = _rank_pair(existing, finding)
         corroborators = set(keep.extra.get("corroborated_by") or [])
-        corroborators.add(drop.source)
+        # name what actually corroborated it: a template id reads better than the entry id
+        # both findings already share
+        corroborators.add(str(drop.extra.get("template_id") or drop.source))
         keep.extra["corroborated_by"] = sorted(corroborators)
         if drop.matched_at and drop.matched_at != keep.matched_at:
             keep.extra.setdefault("also_matched_at", drop.matched_at)
@@ -430,7 +437,7 @@ def _rank_pair(a: Finding, b: Finding) -> tuple[Finding, Finding]:
             f.severity.rank,
             # a local check carries structured extras (account lists, sessions, artifacts)
             # that a template match does not, so it wins an otherwise equal comparison
-            f.source != "nuclei",
+            f.source != "template",
             len(f.evidence),
         )
 

@@ -95,7 +95,7 @@ class Finding:
     title: str
     severity: Severity = Severity.INFO
     confidence: Confidence = Confidence.LIKELY
-    source: str = "kamstrike"          # check id, "nuclei", "default-creds", ...
+    source: str = "kamstrike"          # check id, "template", "default-creds", ...
     cve: list[str] = field(default_factory=list)
     port: int | None = None
     vendor: str = ""

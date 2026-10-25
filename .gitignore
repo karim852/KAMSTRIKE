@@ -11,5 +11,5 @@ venv/
 out/
 results/
 *.log
-nuclei-templates/
+# scan output and caches
 kamstrike-out/
