@@ -18,7 +18,7 @@ def dashboard(tmp_path_factory):
     scan_dir.mkdir()
     (scan_dir / "report.json").write_text(json.dumps({
         "tool": "kamstrike",
-        "engagement": {"operator": "tester", "targets": ["10.0.0.1"], "target_count": 1},
+        "run": {"operator": "tester", "targets": ["10.0.0.1"], "target_count": 1},
         "started_at": 1, "finished_at": 2, "duration_sec": 1,
         "stats": {"findings_total": 1, "by_severity": {"critical": 1}},
         "devices": [{"host": "10.0.0.1", "vendor": "Dahua", "findings": []}],
@@ -111,36 +111,29 @@ def test_unknown_routes_404(dashboard):
 
 
 def test_launching_requires_the_token(dashboard):
+    """The token protects the machine running the dashboard from everyone else on it."""
     base, _ = dashboard
-    status, body = post(base, "/api/scans", {"targets": ["127.0.0.1"], "authorized": True})
+    status, body = post(base, "/api/scans", {"targets": ["127.0.0.1"]})
     assert status == 403
     assert "token" in body["error"]
 
 
 def test_bad_token_rejected(dashboard):
     base, _ = dashboard
-    status, _ = post(base, "/api/scans", {"targets": ["127.0.0.1"], "authorized": True}, "wrong")
+    status, _ = post(base, "/api/scans", {"targets": ["127.0.0.1"]}, "wrong")
     assert status == 403
-
-
-def test_authorization_gate_applies_to_the_api(dashboard):
-    """Holding the dashboard token is not the same as being authorized to scan."""
-    base, token = dashboard
-    status, body = post(base, "/api/scans", {"targets": ["127.0.0.1"], "authorized": False}, token)
-    assert status == 403
-    assert body["kind"] == "authorization"
-
-
-def test_public_targets_refused_from_the_api(dashboard):
-    base, token = dashboard
-    status, body = post(base, "/api/scans", {"targets": ["8.8.8.8"], "authorized": True}, token)
-    assert status == 403
-    assert "private address space" in body["error"]
 
 
 def test_empty_targets_rejected(dashboard):
     base, token = dashboard
-    status, body = post(base, "/api/scans", {"targets": [], "authorized": True}, token)
+    status, body = post(base, "/api/scans", {"targets": []}, token)
+    assert status == 400
+    assert body["kind"] == "input"
+
+
+def test_bad_target_spec_rejected(dashboard):
+    base, token = dashboard
+    status, body = post(base, "/api/scans", {"targets": ["not a target!!"]}, token)
     assert status == 400
     assert body["kind"] == "input"
 
@@ -156,7 +149,7 @@ def test_path_traversal_is_refused(dashboard, bad):
 def test_scan_runs_through_the_api(dashboard, mock_camera):
     base, token = dashboard
     status, body = post(base, "/api/scans", {
-        "targets": ["127.0.0.1"], "authorized": True, "auth_ref": "WEB-TEST",
+        "targets": ["127.0.0.1"], "label": "WEB-TEST",
         "ports": str(mock_camera.port), "nuclei": False, "screenshots": False,
         "login_discovery": False, "streams": False,
     }, token)
@@ -175,7 +168,7 @@ def test_scan_runs_through_the_api(dashboard, mock_camera):
 
     _, raw = get(base, f"/api/scans/{scan_id}")
     report = json.loads(raw)
-    assert report["engagement"]["authorization_reference"] == "WEB-TEST"
+    assert report["run"]["label"] == "WEB-TEST"
     assert report["devices"][0]["vendor"] == "Hikvision"
     assert report["stats"]["findings_total"] >= 1
 

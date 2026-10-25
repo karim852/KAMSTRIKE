@@ -12,3 +12,4 @@ out/
 results/
 *.log
 nuclei-templates/
+kamstrike-out/

@@ -8,10 +8,10 @@ import json
 
 import pytest
 
-from kamstrike.core.authz import enforce
 from kamstrike.core.engine import Engine, ScanOptions
 from kamstrike.core.models import Confidence, Severity
 from kamstrike.core.net import NetConfig
+from kamstrike.core.runmeta import prepare
 from kamstrike.report.writers import write_all
 
 
@@ -28,8 +28,8 @@ def scan(mock_camera, tmp_path):
             cred_delay=0.0,
             **overrides,
         )
-        engagement = enforce(["127.0.0.1"], authorized=True, reference="TEST-1")
-        engine = Engine(NetConfig(timeout=3.0, connect_timeout=1.0), options, engagement)
+        meta, _ = prepare(["127.0.0.1"], label="TEST-1")
+        engine = Engine(NetConfig(timeout=3.0, connect_timeout=1.0), options, meta)
         import asyncio
 
         return asyncio.run(engine.run(["127.0.0.1"]))
@@ -147,7 +147,7 @@ def test_reports_are_written_in_every_format(scan, tmp_path):
         assert path.is_file() and path.stat().st_size > 200
 
     data = json.loads((tmp_path / "report.json").read_text())
-    assert data["engagement"]["authorization_reference"] == "TEST-1"
+    assert data["run"]["label"] == "TEST-1"
     assert data["devices"][0]["vendor"] == "Hikvision"
 
     html = (tmp_path / "report.html").read_text()
@@ -163,8 +163,8 @@ def test_unreachable_host_is_handled(tmp_path):
     import asyncio
 
     options = ScanOptions(ports=[9], run_nuclei=False, outdir=tmp_path)
-    engagement = enforce(["127.0.0.2"], authorized=True)
-    engine = Engine(NetConfig(timeout=0.5, connect_timeout=0.3), options, engagement)
+    meta, _ = prepare(["127.0.0.2"])
+    engine = Engine(NetConfig(timeout=0.5, connect_timeout=0.3), options, meta)
     result = asyncio.run(engine.run(["127.0.0.2"]))
     assert result.devices and not result.alive
     assert result.stats["findings_total"] == 0

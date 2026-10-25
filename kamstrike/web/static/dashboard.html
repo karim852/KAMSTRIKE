@@ -183,8 +183,8 @@
       <div class="card" id="progress-card" style="display:none">
         <h2>Progress</h2><div class="progress" id="progress"></div>
       </div>
-      <div class="card" id="engagement-card" style="display:none">
-        <h2>Engagement</h2><dl class="kv" id="engagement"></dl>
+      <div class="card" id="run-card" style="display:none">
+        <h2>Run</h2><dl class="kv" id="runmeta"></dl>
         <div class="links" id="downloads"></div>
       </div>
     </div>
@@ -288,14 +288,10 @@
   <section id="view-new" style="display:none">
     <div class="card" style="max-width:880px">
       <h2>Launch a scan</h2>
-      <div class="warn">
-        KAMSTRIKE actively tests devices. Only scan equipment you own or have written
-        permission to assess. Every run is recorded in <code>engagement.json</code>.
-      </div>
       <label>Targets (IP, CIDR, 10.0.0.1-50 range, hostname — comma or space separated)</label>
       <textarea id="n-targets" rows="2" placeholder="192.168.1.0/24, 10.0.5.10"></textarea>
       <div class="row">
-        <div><label>Authorization reference</label><input id="n-ref" placeholder="ENG-2214"></div>
+        <div><label>Label</label><input id="n-ref" placeholder="job name, ticket, anything"></div>
         <div><label>Operator</label><input id="n-operator" placeholder="your name"></div>
       </div>
       <div class="row">
@@ -308,8 +304,6 @@
         <div><label>Credential attempts per surface</label>
              <input id="n-creds-n" type="number" value="8" min="0" max="40"></div>
       </div>
-      <label>Scope file (optional allow-list path on the server)</label>
-      <input id="n-scope" placeholder="/path/to/scope.txt">
       <label>Stages</label>
       <div class="checks">
         <label class="check"><input type="checkbox" id="n-checks" checked> vendor checks</label>
@@ -319,16 +313,10 @@
         <label class="check"><input type="checkbox" id="n-login" checked> login surfaces</label>
         <label class="check"><input type="checkbox" id="n-shots"> screenshots</label>
         <label class="check"><input type="checkbox" id="n-geoip"> geolocation lookup</label>
-        <label class="check"><input type="checkbox" id="n-large"> allow large sweep</label>
-        <label class="check"><input type="checkbox" id="n-public"> allow public targets</label>
       </div>
       <div class="warn bad">
         <label class="check"><input type="checkbox" id="n-exploit"> <b>--exploit</b>: allow
         state-changing verification (command execution, marker files). Off by default.</label>
-      </div>
-      <div class="warn good">
-        <label class="check"><input type="checkbox" id="n-authorized">
-        <b>I am authorized to assess these targets.</b></label>
       </div>
       <label>Dashboard token (printed when the server started)</label>
       <input id="n-token" placeholder="paste token">
@@ -416,7 +404,7 @@ async function loadScans() {
     const sev = (s.stats || {}).by_severity || {};
     const counts = ['critical', 'high'].map((k) => sev[k] ? `${sev[k]} ${k}` : '')
       .filter(Boolean).join(', ');
-    const targets = ((s.engagement || {}).targets || s.targets || []).join(', ');
+    const targets = ((s.run || {}).targets || s.targets || []).join(', ');
     return `<div class="scan ${s.id === state.scanId ? 'active' : ''}" data-id="${esc(s.id)}">
       <div class="id"><span class="dot ${esc(s.state)}"></span>${esc(s.id)}</div>
       <div class="sub">${esc(targets.slice(0, 46)) || '—'}</div>
@@ -442,7 +430,7 @@ function renderPending(status) {
     ? `<div class="warn bad">${esc(status.error)}</div>`
     : `<div class="empty">scan ${esc(status.state || '')}…</div>`;
   ['#devices tbody', '#findings tbody'].forEach((s) => { $(s).innerHTML = ''; });
-  $('#engagement-card').style.display = 'none';
+  $('#run-card').style.display = 'none';
 }
 
 function pollStatus() {
@@ -482,16 +470,16 @@ function renderReport() {
     tile(st.screenshots ?? 0, 'screenshots'),
   ].join('');
 
-  const eng = r.engagement || {};
-  $('#engagement-card').style.display = 'block';
-  $('#engagement').innerHTML = [
-    ['operator', eng.operator], ['reference', eng.authorization_reference || '—'],
-    ['scope', (eng.targets || []).join(', ')], ['hosts', eng.target_count],
-    ['started', eng.started_at_iso], ['duration', (r.duration_sec ?? 0) + 's'],
-    ['scope file', eng.scope_file || '—'],
+  const meta = r.run || {};
+  $('#run-card').style.display = 'block';
+  $('#runmeta').innerHTML = [
+    ['operator', meta.operator], ['label', meta.label || '—'],
+    ['targets', (meta.targets || []).join(', ')], ['hosts', meta.target_count],
+    ['started', meta.started_at_iso], ['duration', (r.duration_sec ?? 0) + 's'],
+    ['launched from', meta.launched_from || '—'],
   ].map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   const id = encodeURIComponent(state.scanId);
-  $('#downloads').innerHTML = ['report.html', 'report.md', 'findings.csv', 'engagement.json']
+  $('#downloads').innerHTML = ['report.html', 'report.md', 'findings.csv', 'run.json']
     .map((f) => `<a href="/api/scans/${id}/${f}" target="_blank">${f}</a>`).join('');
 
   const vendors = Array.from(new Set(r.devices.map((d) => d.vendor).filter(Boolean))).sort();
@@ -822,7 +810,7 @@ function openExploit(e) {
     <h2>What it is</h2><div class="evidence">${esc(e.description)}</div>
     <h2>Remediation</h2><div class="evidence">${esc(e.remediation || '—')}</div>
     <h2>Run just this entry</h2>
-    <div class="cmd">kamstrike scan &lt;target&gt; --authorized --only ${esc(e.id)}${
+    <div class="cmd">kamstrike scan &lt;target&gt; --only ${esc(e.id)}${
       e.intrusive ? ' --exploit' : ''}</div>
     ${e.references.length ? `<h2>References</h2><div class="links">${
       e.references.map((r) => `<a href="${esc(r)}" target="_blank">${esc(r)}</a>`)
@@ -845,16 +833,14 @@ $('#launch').addEventListener('click', async () => {
   msg.textContent = 'starting…';
   const body = {
     targets: $('#n-targets').value.split(/[\s,]+/).filter(Boolean),
-    authorized: $('#n-authorized').checked,
-    auth_ref: $('#n-ref').value, operator: $('#n-operator').value,
-    scope_file: $('#n-scope').value, profile: $('#n-profile').value,
+    label: $('#n-ref').value, operator: $('#n-operator').value,
+    profile: $('#n-profile').value,
     ports: $('#n-ports').value, min_severity: $('#n-sev').value,
     cred_attempts: +$('#n-creds-n').value,
     checks: $('#n-checks').checked, nuclei: $('#n-nuclei').checked,
     creds: $('#n-creds').checked, streams: $('#n-streams').checked,
     login_discovery: $('#n-login').checked, screenshots: $('#n-shots').checked,
     geoip: $('#n-geoip').checked, exploit: $('#n-exploit').checked,
-    allow_large: $('#n-large').checked, allow_public: $('#n-public').checked,
   };
   try {
     const res = await api('/api/scans', {

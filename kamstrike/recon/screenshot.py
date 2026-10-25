@@ -42,7 +42,7 @@ async def capture(
     *,
     timeout: float = 12.0,
     max_per_host: int = 2,
-    total_timeout: float = 300.0,
+    total_timeout: float | None = None,
     user_agent: str = "",
 ) -> str:
     """Screenshot each device's web interfaces into ``outdir``. Returns a status note."""
@@ -62,6 +62,10 @@ async def capture(
             owner[url] = device
     if not targets:
         return "screenshots skipped: no web services"
+
+    if total_timeout is None:
+        # one browser launch (which can be slow on a loaded host) plus the per-page budget
+        total_timeout = 45.0 + timeout * len(targets)
 
     job = json.dumps(
         {
@@ -90,7 +94,10 @@ async def capture(
     except asyncio.TimeoutError:
         proc.kill()
         await proc.communicate()
-        return f"screenshots aborted after {total_timeout:.0f}s"
+        return (
+            f"screenshots aborted after {total_timeout:.0f}s "
+            f"({len(targets)} target(s)); the rest of the scan was unaffected"
+        )
 
     text = stdout.decode("utf-8", "replace").strip()
     if not text:

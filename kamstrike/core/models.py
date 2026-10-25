@@ -222,7 +222,7 @@ class ScanResult:
     devices: list[Device] = field(default_factory=list)
     started_at: float = field(default_factory=time.time)
     finished_at: float = 0.0
-    engagement: dict[str, Any] = field(default_factory=dict)
+    run: dict[str, Any] = field(default_factory=dict)
     stats: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -236,7 +236,7 @@ class ScanResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "tool": "kamstrike",
-            "engagement": self.engagement,
+            "run": self.run,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "duration_sec": round(max(0.0, self.finished_at - self.started_at), 2),

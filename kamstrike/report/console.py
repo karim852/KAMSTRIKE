@@ -28,10 +28,17 @@ BANNER = r"""
 
 
 def banner(console: Console, version: str) -> None:
-    console.print(Text(BANNER, style="bold cyan"))
+    """Print the splash, with the live database counts so the operator knows what loaded."""
+    from ..core import kb
+
+    creds = kb.cred_db()
+    console.print(Text(BANNER, style="bold green"))
     console.print(
-        f"  camera / NVR / DVR assessment framework  v{version}\n"
-        "  [dim]authorized testing only - every run is recorded in engagement.json[/dim]\n"
+        f"  camera / NVR / DVR assessment framework  [bold]v{version}[/bold]\n"
+        f"  [dim]{len(kb.vendor_db().vendors)} vendors · {len(kb.kb_entries())} exploits · "
+        f"{len({c for e in kb.kb_entries() for c in e.cves})} CVEs · "
+        f"{len(creds.global_creds) + sum(len(v) for v in creds.by_vendor.values())} "
+        f"default credentials[/dim]\n"
     )
 
 

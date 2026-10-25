@@ -4,12 +4,9 @@ A dependency-free HTTP server (stdlib only) that serves a single-page dashboard 
 small JSON API. No build step and no CDN, so it works on an isolated assessment network
 where a React toolchain and a CDN would not.
 
-Security posture, because this endpoint can start scans:
-
-* binds to 127.0.0.1 unless told otherwise, and says so loudly if told otherwise
-* mutating endpoints require the token printed at startup
-* the authorization gate still applies to scans launched from the UI - the operator ticks
-  the authorization box and the run is recorded in engagement.json exactly as on the CLI
+The endpoint can start scans, so it binds to 127.0.0.1 unless told otherwise and mutating
+endpoints require the token printed at startup. That token protects the machine running the
+dashboard; it says nothing about the targets.
 """
 
 from __future__ import annotations
@@ -29,11 +26,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 from .. import __version__
 from ..checks import base as checks_base
 from ..core import kb
-from ..core.authz import AuthorizationError, enforce
 from ..core.engine import Engine, ScanOptions
 from ..core.models import Severity
 from ..core.net import PORT_PROFILES, profile_ports
-from ..core.targets import TargetError, iter_targets
+from ..core.runmeta import prepare
+from ..core.targets import TargetError
 from ..nuclei import runner as nuclei_runner
 from ..report.writers import write_all
 
@@ -73,7 +70,7 @@ class ScanRegistry:
                 "started_at": data.get("started_at"),
                 "finished_at": data.get("finished_at"),
                 "duration_sec": data.get("duration_sec"),
-                "engagement": data.get("engagement", {}),
+                "run": data.get("run", {}),
                 "stats": {k: v for k, v in stats.items() if k != "nuclei"},
             }
         with self._lock:
@@ -125,20 +122,17 @@ class ScanRegistry:
         if not targets:
             raise ValueError("no targets given")
 
-        engagement = enforce(
+        meta, hosts = prepare(
             targets,
-            authorized=bool(payload.get("authorized")),
-            scope_file=payload.get("scope_file") or None,
-            reference=str(payload.get("auth_ref") or ""),
             operator=str(payload.get("operator") or ""),
-            allow_large=bool(payload.get("allow_large")),
-            allow_public=bool(payload.get("allow_public")),
+            label=str(payload.get("label") or ""),
         )
-        hosts = list(iter_targets(targets))
+        if not hosts:
+            raise ValueError("no targets resolved from the given specification")
         scan_id = time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3)
         outdir = self.results_dir / scan_id
         options, net = _options_from_payload(payload, outdir)
-        engagement.write(outdir)
+        meta.write(outdir)
 
         run: dict[str, Any] = {
             "state": "running",
@@ -157,7 +151,7 @@ class ScanRegistry:
 
         def worker() -> None:
             try:
-                engine = Engine(net, options, engagement, progress=record)
+                engine = Engine(net, options, meta, progress=record)
                 result = asyncio.run(engine.run(hosts))
                 write_all(result, outdir, ["json", "md", "html", "csv"])
                 with self._lock:
@@ -254,7 +248,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _authorized(self) -> bool:
+    def _has_token(self) -> bool:
         supplied = self.headers.get("X-KAMSTRIKE-Token", "")
         if not supplied:
             supplied = parse_qs(urlparse(self.path).query).get("token", [""])[0]
@@ -333,7 +327,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif parts[1] == "screenshots" and len(parts) == 3:
             name = self._safe_id(parts[2])
             self._file(self.registry.outdir(scan_id) / "screenshots" / name)
-        elif parts[1] in ("report.md", "report.html", "findings.csv", "engagement.json"):
+        elif parts[1] in ("report.md", "report.html", "findings.csv", "run.json"):
             self._file(self.registry.outdir(scan_id) / parts[1])
         else:
             self._json({"error": "no such route"}, 404)
@@ -343,14 +337,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if route != "/api/scans":
             self._json({"error": "no such route"}, 404)
             return
-        if not self._authorized():
+        if not self._has_token():
             self._json({"error": "missing or bad dashboard token"}, 403)
             return
         payload = self._body()
         try:
             self._json(self.registry.start(payload), 202)
-        except AuthorizationError as exc:
-            self._json({"error": str(exc), "kind": "authorization"}, 403)
         except (TargetError, ValueError) as exc:
             self._json({"error": str(exc), "kind": "input"}, 400)
 

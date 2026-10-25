@@ -12,10 +12,10 @@ from rich.console import Console
 from . import __version__
 from .checks import base as checks_base
 from .core import kb
-from .core.authz import AuthorizationError, enforce
 from .core.engine import Engine, ScanOptions
 from .core.models import Severity
 from .core.net import PORT_PROFILES, NetConfig, profile_ports
+from .core.runmeta import prepare
 from .core.targets import TargetError, iter_targets
 from .nuclei import runner as nuclei_runner
 from .report import console as console_report
@@ -23,16 +23,13 @@ from .report.writers import write_all
 
 EPILOG = """\
 examples:
-  kamstrike scan 192.168.1.0/24 --authorized
-  kamstrike scan 10.0.5.10 --authorized --auth-ref ENG-2214 --full-ports --format html,json
-  kamstrike scan 10.0.0.0/22 --authorized --scope-file scope.txt --no-creds
-  kamstrike scan 192.168.1.64 --authorized --exploit --only hikvision-webdav-rce
-  kamstrike vendors
+  kamstrike scan 192.168.1.0/24
+  kamstrike scan 10.0.5.10 --profile full --screenshots --format html,json
+  kamstrike scan 10.0.0.0/22 --min-severity high --no-creds -q
+  kamstrike scan 192.168.1.64 --exploit --only hikvision-webdav-rce
+  kamstrike serve
   kamstrike kb --vendor Dahua
   kamstrike checks
-
-KAMSTRIKE actively tests devices. Point it only at equipment you own or have written
-permission to assess. Every run writes engagement.json recording operator, scope and time.
 """
 
 
@@ -51,17 +48,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("targets", nargs="*", help="IP, CIDR, 10.0.0.1-50 range, or hostname")
     s.add_argument("-f", "--target-file", help="file with one target per line")
 
-    auth = s.add_argument_group("authorization (required)")
-    auth.add_argument("--authorized", action="store_true",
-                      help="confirm you are authorized to test these targets")
-    auth.add_argument("--auth-ref", default="", metavar="REF",
-                      help="contract / ticket / engagement id, recorded in the report")
-    auth.add_argument("--operator", default="", help="operator name for the report")
-    auth.add_argument("--scope-file", help="allow-list of networks; targets outside it are refused")
-    auth.add_argument("--allow-large", action="store_true",
-                      help="permit sweeps above the host-count safety threshold")
-    auth.add_argument("--allow-public", action="store_true",
-                      help="permit targets outside private address space")
+    meta = s.add_argument_group("run record")
+    meta.add_argument("--label", default="", metavar="TEXT",
+                      help="free-form label for this run, recorded in the report")
+    meta.add_argument("--operator", default="", help="operator name for the report")
 
     disc = s.add_argument_group("discovery")
     disc.add_argument("-p", "--ports", help="comma-separated ports or ranges, e.g. 80,8000-8100")
@@ -343,29 +333,27 @@ def _split(value: str) -> list[str]:
 
 def cmd_scan(console: Console, args: argparse.Namespace) -> int:
     if not args.targets and not args.target_file:
-        console.print("[red]no targets given[/red]  (try: kamstrike scan 192.168.1.0/24 --authorized)")
+        console.print("[red]no targets given[/red]  (try: kamstrike scan 192.168.1.0/24)")
         return 2
     if not args.no_banner and not args.quiet:
         console_report.banner(console, __version__)
 
     try:
-        engagement = enforce(
+        meta, hosts = prepare(
             args.targets,
             target_file=args.target_file,
-            authorized=args.authorized,
-            scope_file=args.scope_file,
-            reference=args.auth_ref,
             operator=args.operator,
-            allow_large=args.allow_large,
-            allow_public=args.allow_public,
+            label=args.label,
         )
-        hosts = list(iter_targets(args.targets, args.target_file))
-    except (AuthorizationError, TargetError) as exc:
-        console.print(f"\n[bold red]refusing to run:[/bold red] {exc}\n")
-        return 3
+    except TargetError as exc:
+        console.print(f"\n[bold red]bad target specification:[/bold red] {exc}\n")
+        return 2
+    if not hosts:
+        console.print("[red]no targets resolved from the given specification[/red]")
+        return 2
 
     outdir = Path(args.outdir)
-    engagement_path = engagement.write(outdir)
+    run_path = meta.write(outdir)
 
     net = NetConfig(
         timeout=args.timeout,
@@ -423,8 +411,8 @@ def cmd_scan(console: Console, args: argparse.Namespace) -> int:
         if stage == "start":
             console.print(
                 f"[dim]scanning {data['hosts']} host(s) across {data['ports']} port(s)"
-                f" - operator {engagement.operator}"
-                + (f", ref {engagement.reference}" if engagement.reference else "")
+                f" - operator {meta.operator}"
+                + (f", label {meta.label}" if meta.label else "")
                 + "[/dim]"
             )
         elif stage == "portscan-done":
@@ -452,7 +440,7 @@ def cmd_scan(console: Console, args: argparse.Namespace) -> int:
         elif stage == "nuclei-done":
             console.print(f"nuclei added {data['findings']} finding(s)")
 
-    engine = Engine(net, options, engagement, progress=progress)
+    engine = Engine(net, options, meta, progress=progress)
     result = asyncio.run(engine.run(hosts))
 
     written = write_all(result, outdir, _split(args.format))
@@ -461,7 +449,7 @@ def cmd_scan(console: Console, args: argparse.Namespace) -> int:
         console_report.credentials_table(console, result)
         console_report.streams_list(console, result)
     console_report.summary(console, result)
-    console.print(f"\nengagement record: [bold]{engagement_path}[/bold]")
+    console.print(f"\nrun record: [bold]{run_path}[/bold]")
     for path in written:
         console.print(f"report: [bold]{path}[/bold]")
 

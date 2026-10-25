@@ -65,15 +65,15 @@ def _summary_rows(result: ScanResult) -> list[tuple[str, int]]:
 
 
 def write_markdown(result: ScanResult) -> str:
-    eng = result.engagement
+    eng = result.run
     lines: list[str] = []
     a = lines.append
     a("# KAMSTRIKE assessment report")
     a("")
     a(f"- Operator: `{eng.get('operator', '?')}`")
-    if eng.get("authorization_reference"):
-        a(f"- Authorization reference: `{eng['authorization_reference']}`")
-    a(f"- Scope: {', '.join(eng.get('targets', [])) or 'n/a'} "
+    if eng.get("label"):
+        a(f"- Label: `{eng['label']}`")
+    a(f"- Targets: {', '.join(eng.get('targets', [])) or 'n/a'} "
       f"({eng.get('target_count', 0)} hosts)")
     a(f"- Started: {eng.get('started_at_iso', '?')}  |  Duration: "
       f"{result.to_dict()['duration_sec']}s")
@@ -200,7 +200,7 @@ def write_markdown(result: ScanResult) -> str:
 
 
 def write_html(result: ScanResult) -> str:
-    eng = result.engagement
+    eng = result.run
     e = html.escape
 
     def badge(sev: str) -> str:
@@ -371,12 +371,11 @@ def write_html(result: ScanResult) -> str:
 <h1>KAMSTRIKE assessment report</h1>
 <div class="meta">
   operator <code>{e(str(eng.get('operator', '?')))}</code> &middot;
-  scope <code>{e(', '.join(eng.get('targets', [])) or 'n/a')}</code>
+  targets <code>{e(', '.join(eng.get('targets', [])) or 'n/a')}</code>
   ({eng.get('target_count', 0)} hosts) &middot;
   {e(str(eng.get('started_at_iso', '')))} &middot;
   {result.to_dict()['duration_sec']}s
-  {('&middot; authorization ref <code>' + e(str(eng['authorization_reference'])) + '</code>')
-   if eng.get('authorization_reference') else ''}
+  {('&middot; label <code>' + e(str(eng['label'])) + '</code>') if eng.get('label') else ''}
 </div>
 <div class="stats">{summary}
   <div class="stat"><span class="n">{result.stats.get('hosts_responding', 0)}</span>

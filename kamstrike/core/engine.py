@@ -19,9 +19,9 @@ from pathlib import Path
 from ..checks import base as checks_base
 from ..nuclei import runner as nuclei_runner
 from . import kb
-from .authz import Engagement
 from .models import Confidence, Device, Finding, ScanResult, Severity
 from .net import CAMERA_PORTS, QUICK_PORTS, HttpProbe, NetConfig, build_client
+from .runmeta import RunMetadata
 
 ProgressFn = Callable[[str, dict], None]
 
@@ -63,18 +63,18 @@ class Engine:
         self,
         cfg: NetConfig,
         options: ScanOptions,
-        engagement: Engagement,
+        meta: RunMetadata,
         progress: ProgressFn | None = None,
     ) -> None:
         self.cfg = cfg
         self.options = options
-        self.engagement = engagement
+        self.meta = meta
         self.progress = progress or (lambda stage, data: None)
         checks_base.load_all()
 
     # ------------------------------------------------------------------ stages
     async def run(self, hosts: list[str]) -> ScanResult:
-        result = ScanResult(engagement=self.engagement.to_dict())
+        result = ScanResult(run=self.meta.to_dict())
         self.progress("start", {"hosts": len(hosts), "ports": len(self.options.ports)})
 
         devices = await self._portscan(hosts)
